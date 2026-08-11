@@ -1,0 +1,2170 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prudle Portal</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* =========================
+       RESET + SAFE WIDTH
+    ========================== */
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+      font-family: 'Tajawal', sans-serif;
+      background:
+        radial-gradient(circle at top right, #eaf4ff 0%, #d8e9ff 35%, #f5f9ff 70%, #eef5ff 100%);
+      color: #16324f;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box !important;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    a {
+      text-decoration: none;
+    }
+
+    /* =========================
+       PAGE WRAP
+    ========================== */
+    .page-shell {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .portal-wrap {
+      width: 100%;
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 30px;
+      box-shadow: 0 18px 45px rgba(18, 56, 98, 0.14);
+      overflow: hidden;
+    }
+
+    /* =========================
+       HERO HEADER
+    ========================== */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 34px 24px 26px;
+      background:
+        linear-gradient(135deg, #123f77 0%, #1e5da8 38%, #2f7fe0 100%);
+      color: #fff;
+    }
+
+    .hero::before,
+    .hero::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.18;
+    }
+
+    .hero::before {
+      width: 300px;
+      height: 300px;
+      top: -130px;
+      left: -70px;
+      background: #ffffff;
+    }
+
+    .hero::after {
+      width: 220px;
+      height: 220px;
+      bottom: -110px;
+      right: -60px;
+      background: #9ed1ff;
+    }
+
+    .hero-top {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .logo-ring {
+      flex: 0 0 88px;
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      padding: 4px;
+      background: linear-gradient(135deg, #ffffff, #d9eeff, #8ec5ff);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    }
+
+    .logo-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .logo-inner img {
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
+    }
+
+    .hero-text {
+      min-width: 0;
+    }
+
+    .hero-title {
+      margin: 0;
+      font-size: 34px;
+      font-weight: 900;
+      line-height: 1.2;
+      letter-spacing: .2px;
+    }
+
+    .hero-subtitle {
+      margin: 8px 0 0;
+      font-size: 15px;
+      font-weight: 500;
+      opacity: 0.96;
+      line-height: 1.8;
+    }
+
+    .hero-badge {
+      position: relative;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.22);
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+    }
+
+    .hero-stats {
+      position: relative;
+      z-index: 2;
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 14px;
+    }
+
+    .stat-card {
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      padding: 16px;
+      min-width: 0;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      font-weight: 700;
+      opacity: .92;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+
+    /* =========================
+       MAIN AREA
+    ========================== */
+    .content {
+      padding: 24px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 24px;
+      color: #123f77;
+      font-weight: 900;
+    }
+
+    .section-note {
+      font-size: 14px;
+      color: #5d738e;
+      font-weight: 600;
+    }
+
+    /* =========================
+       ZOOM FEATURE CARD
+    ========================== */
+    .zoom-feature {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1.25fr .85fr;
+      gap: 18px;
+      background: linear-gradient(135deg, #6e38ea 0%, #4b52e5 48%, #2b7de9 100%);
+      color: #fff;
+      border-radius: 26px;
+      padding: 24px;
+      box-shadow: 0 20px 36px rgba(79, 70, 229, 0.22);
+      margin-bottom: 24px;
+    }
+
+    .zoom-feature::before {
+      content: "";
+      position: absolute;
+      inset: auto auto -70px -50px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.10);
+    }
+
+    .zoom-feature::after {
+      content: "";
+      position: absolute;
+      inset: -50px -50px auto auto;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .zoom-left,
+    .zoom-right {
+      position: relative;
+      z-index: 1;
+      min-width: 0;
+    }
+
+    .zoom-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+
+    .zoom-title {
+      margin: 0 0 10px;
+      font-size: 31px;
+      line-height: 1.25;
+      font-weight: 900;
+    }
+
+    .zoom-desc {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.9;
+      opacity: 0.98;
+      max-width: 720px;
+    }
+
+    .zoom-actions {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .btn-main,
+    .btn-light {
+      min-height: 50px;
+      padding: 0 18px;
+      border-radius: 16px;
+      font-weight: 900;
+      font-size: 15px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: .25s ease;
+    }
+
+    .btn-main {
+      background: #fff;
+      color: #3f3ae0;
+      box-shadow: 0 12px 26px rgba(0,0,0,0.12);
+    }
+
+    .btn-main:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-light {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+
+    .btn-light:hover {
+      background: rgba(255,255,255,0.18);
+    }
+
+    .zoom-mini-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      height: 100%;
+    }
+
+    .zoom-mini {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .zoom-mini h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .zoom-mini p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.8;
+      opacity: .95;
+    }
+
+    /* =========================
+       SERVICE CARDS
+    ========================== */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .service-card {
+      position: relative;
+      display: block;
+      min-width: 0;
+      background: #fff;
+      border-radius: 22px;
+      padding: 20px 18px;
+      box-shadow: 0 12px 28px rgba(16, 54, 92, 0.08);
+      border: 1px solid #edf3fb;
+      transition: .28s ease;
+      overflow: hidden;
+    }
+
+    .service-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 18px 32px rgba(16, 54, 92, 0.12);
+    }
+
+    .service-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 5px;
+    }
+
+    .service-academic::before { background: linear-gradient(90deg,#164478,#2b7de9); }
+    .service-files::before { background: linear-gradient(90deg,#0f766e,#14b8a6); }
+    .service-library::before { background: linear-gradient(90deg,#0b3a6e,#3b82f6); }
+    .service-chat::before { background: linear-gradient(90deg,#b91c1c,#ef4444); }
+
+    .service-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 18px rgba(0,0,0,0.08);
+    }
+
+    .icon-academic { background: linear-gradient(135deg,#e8f1ff,#cfe3ff); }
+    .icon-files { background: linear-gradient(135deg,#d8fff8,#c0f4ea); }
+    .icon-library { background: linear-gradient(135deg,#e7efff,#d8e4ff); }
+    .icon-chat { background: linear-gradient(135deg,#ffe8e8,#ffd0d0); }
+.service-activities::before{
+  background:linear-gradient(90deg,#7c3aed,#a855f7);
+}
+
+.icon-activities{
+  background:linear-gradient(135deg,#f3e8ff,#e9d5ff);
+}
+    .service-title {
+      margin: 0 0 8px;
+      color: #143f74;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.4;
+    }
+
+    .service-desc {
+      margin: 0 0 16px;
+      color: #62778f;
+      font-size: 14px;
+      line-height: 1.85;
+      min-height: 76px;
+    }
+
+    .service-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #164478;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    /* =========================
+       BRANCHES
+    ========================== */
+    .branches-wrap {
+      background: linear-gradient(180deg, #f8fbff 0%, #f3f8ff 100%);
+      border: 1px solid #e6eef8;
+      border-radius: 26px;
+      padding: 20px;
+    }
+
+    .branches-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 16px;
+    }
+
+    .branch-card {
+      display: block;
+      min-width: 0;
+      border-radius: 22px;
+      padding: 20px;
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(0,0,0,0.16);
+      transition: .28s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .branch-card:hover {
+      transform: translateY(-4px);
+    }
+
+    .branch-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top, rgba(255,255,255,0.24), transparent 65%);
+      pointer-events: none;
+    }
+
+    .branch-men    { background: linear-gradient(135deg,#164478,#1c5ea8); }
+    .branch-women  { background: linear-gradient(135deg,#8740ac,#bf6bf0); }
+    .branch-zahra  { background: linear-gradient(135deg,#df7c1d,#f2b24e); }
+    .branch-online { background: linear-gradient(135deg,#0e8f88,#1db7ac); }
+
+    .branch-label {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.18);
+      font-size: 12px;
+      font-weight: 900;
+      margin-bottom: 14px;
+    }
+
+    .branch-title {
+      position: relative;
+      z-index: 1;
+      margin: 0 0 8px;
+      font-size: 21px;
+      line-height: 1.5;
+      font-weight: 900;
+    }
+
+    .branch-desc {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.85;
+      opacity: 0.97;
+    }
+
+    /* =========================
+       FOOTER
+    ========================== */
+    .footer-note {
+      text-align: center;
+      color: #6b7f96;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 18px 10px 6px;
+    }
+
+    /* =========================
+       RESPONSIVE
+    ========================== */
+    @media (max-width: 1100px) {
+      .services-grid,
+      .branches-grid {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+      }
+
+      .zoom-feature {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page-shell {
+        padding: 10px;
+      }
+
+      .portal-wrap {
+        border-radius: 20px;
+      }
+
+      .hero {
+        padding: 22px 16px 18px;
+      }
+
+      .hero-title {
+        font-size: 26px;
+      }
+
+      .hero-subtitle {
+        font-size: 14px;
+        line-height: 1.8;
+      }
+
+      .logo-ring {
+        width: 74px;
+        height: 74px;
+        flex-basis: 74px;
+      }
+
+      .logo-inner img {
+        width: 48px;
+        height: 48px;
+      }
+
+      .hero-stats {
+        grid-template-columns: 1fr;
+      }
+
+      .content {
+        padding: 16px;
+      }
+
+      .zoom-feature {
+        padding: 18px;
+        border-radius: 20px;
+      }
+
+      .zoom-title {
+        font-size: 24px;
+      }
+
+      .section-title {
+        font-size: 21px;
+      }
+
+      .services-grid,
+      .branches-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .service-desc {
+        min-height: unset;
+      }
+
+      .branch-title {
+        font-size: 19px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .hero-top {
+        align-items: flex-start;
+      }
+
+      .brand-box {
+        align-items: flex-start;
+      }
+
+      .hero-badge {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .btn-main,
+      .btn-light {
+        width: 100%;
+      }
+
+      .zoom-actions {
+        flex-direction: column;
+      }
+    }
+  </style>
+
+  <!-- Prudle Student Smart Notifications -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
+
+  <style id="prudle-student-smart-center-style">
+    .prudle-smart-tools{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:14px;
+      margin:0 0 24px;
+    }
+    .prudle-smart-card{
+      position:relative;
+      overflow:hidden;
+      border:1px solid #e3edf8;
+      border-radius:22px;
+      padding:17px 18px;
+      background:#fff;
+      box-shadow:0 10px 26px rgba(18,63,119,.075);
+      display:flex;
+      align-items:center;
+      gap:14px;
+      min-height:96px;
+      cursor:pointer;
+      transition:.22s ease;
+    }
+    .prudle-smart-card:hover{
+      transform:translateY(-3px);
+      box-shadow:0 16px 34px rgba(18,63,119,.12);
+    }
+    .prudle-smart-card::before{
+      content:"";
+      position:absolute;
+      inset:0 auto 0 0;
+      width:5px;
+    }
+    .prudle-smart-card.notification::before{
+      background:linear-gradient(#10b981,#22c55e);
+    }
+    .prudle-smart-card.history::before{
+      background:linear-gradient(#164478,#2b7de9);
+    }
+    .prudle-smart-icon{
+      width:52px;
+      height:52px;
+      flex:0 0 52px;
+      border-radius:16px;
+      display:grid;
+      place-items:center;
+      font-size:21px;
+    }
+    .notification .prudle-smart-icon{
+      background:#eafaf4;
+      color:#0b8a5e;
+    }
+    .history .prudle-smart-icon{
+      background:#eaf3ff;
+      color:#164478;
+    }
+    .prudle-smart-copy{
+      flex:1;
+      min-width:0;
+    }
+    .prudle-smart-copy b{
+      display:block;
+      color:#163d6d;
+      font-size:16px;
+      margin-bottom:4px;
+    }
+    .prudle-smart-copy span{
+      color:#6a7f95;
+      font-size:12px;
+      font-weight:700;
+      line-height:1.7;
+    }
+    .prudle-smart-count{
+      min-width:34px;
+      height:34px;
+      padding:0 8px;
+      border-radius:999px;
+      display:grid;
+      place-items:center;
+      background:#16a34a;
+      color:#fff;
+      font-size:12px;
+      font-weight:900;
+      box-shadow:0 7px 16px rgba(22,163,74,.22);
+    }
+    .prudle-smart-count.zero{
+      background:#dce7f2;
+      color:#60748a;
+      box-shadow:none;
+    }
+
+    .prudle-notification-fab{
+      position:fixed;
+      left:22px;
+      bottom:22px;
+      z-index:9700;
+      width:58px;
+      height:58px;
+      border:0;
+      border-radius:19px;
+      display:none;
+      place-items:center;
+      background:linear-gradient(135deg,#164478,#2b7de9);
+      color:#fff;
+      font-size:22px;
+      cursor:pointer;
+      box-shadow:0 14px 30px rgba(22,68,120,.27);
+      transition:.2s;
+    }
+    .prudle-notification-fab.show{display:grid}
+    .prudle-notification-fab.has-items{
+      background:linear-gradient(135deg,#0f9f6e,#16a34a);
+      animation:prudleNotifPulse 1.7s infinite;
+    }
+    .prudle-notification-fab .count{
+      position:absolute;
+      right:-6px;
+      top:-7px;
+      min-width:24px;
+      height:24px;
+      padding:0 6px;
+      border-radius:999px;
+      border:3px solid #fff;
+      background:#ef4444;
+      color:#fff;
+      display:grid;
+      place-items:center;
+      font-size:10px;
+      font-weight:900;
+    }
+    .prudle-notification-fab .count.hidden{display:none}
+    @keyframes prudleNotifPulse{
+      50%{box-shadow:0 0 0 9px rgba(16,185,129,.13),0 16px 34px rgba(15,159,110,.28)}
+    }
+
+    .prudle-center-backdrop{
+      position:fixed;
+      inset:0;
+      z-index:9750;
+      background:rgba(11,30,51,.50);
+      opacity:0;
+      visibility:hidden;
+      transition:.25s;
+    }
+    .prudle-center-backdrop.open{
+      opacity:1;
+      visibility:visible;
+    }
+    .prudle-center-panel{
+      position:fixed;
+      top:0;
+      left:0;
+      z-index:9800;
+      width:min(510px,96vw);
+      height:100dvh;
+      background:#f6f9fd;
+      box-shadow:18px 0 48px rgba(14,42,71,.24);
+      transform:translateX(-105%);
+      transition:.3s ease;
+      overflow:auto;
+      padding:18px;
+    }
+    .prudle-center-panel.open{transform:none}
+    .prudle-center-head{
+      position:sticky;
+      top:0;
+      z-index:2;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background:linear-gradient(135deg,#164478,#2467a5);
+      color:#fff;
+      padding:17px;
+      border-radius:20px;
+      box-shadow:0 10px 24px rgba(22,68,120,.18);
+    }
+    .prudle-center-head h3{
+      margin:0;
+      font-size:19px;
+    }
+    .prudle-center-head p{
+      margin:4px 0 0;
+      opacity:.82;
+      font-size:11px;
+      font-weight:700;
+    }
+    .prudle-center-close{
+      width:40px;
+      height:40px;
+      border:0;
+      border-radius:12px;
+      background:rgba(255,255,255,.16);
+      color:#fff;
+      cursor:pointer;
+      font-size:17px;
+    }
+    .prudle-center-tabs{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin:14px 0;
+      background:#eaf1f8;
+      padding:6px;
+      border-radius:15px;
+    }
+    .prudle-center-tab{
+      border:0;
+      border-radius:11px;
+      padding:11px 8px;
+      background:transparent;
+      color:#60748a;
+      font-family:inherit;
+      font-weight:900;
+      cursor:pointer;
+    }
+    .prudle-center-tab.active{
+      background:#fff;
+      color:#164478;
+      box-shadow:0 4px 12px rgba(22,68,120,.08);
+    }
+    .prudle-tab-panel{display:none}
+    .prudle-tab-panel.active{display:block}
+    .prudle-center-summary{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:8px;
+      margin-bottom:13px;
+    }
+    .prudle-summary-box{
+      background:#fff;
+      border:1px solid #e2ebf5;
+      border-radius:14px;
+      padding:11px 8px;
+      text-align:center;
+    }
+    .prudle-summary-box b{
+      display:block;
+      color:#164478;
+      font-size:20px;
+    }
+    .prudle-summary-box span{
+      color:#7a8da2;
+      font-size:10px;
+      font-weight:800;
+    }
+    .prudle-feed{
+      display:grid;
+      gap:10px;
+    }
+    .prudle-feed-item{
+      background:#fff;
+      border:1px solid #e1eaf4;
+      border-radius:17px;
+      padding:14px;
+      box-shadow:0 6px 16px rgba(22,68,120,.05);
+    }
+    .prudle-feed-item.individual{
+      border-right:4px solid #16a34a;
+      background:linear-gradient(90deg,#fff,#f4fff8);
+    }
+    .prudle-feed-item.homework{
+      border-right:4px solid #f59e0b;
+    }
+    .prudle-feed-item.result{
+      border-right:4px solid #2467a5;
+    }
+    .prudle-item-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:9px;
+    }
+    .prudle-item-type{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      border-radius:999px;
+      padding:5px 8px;
+      font-size:10px;
+      font-weight:900;
+      white-space:nowrap;
+    }
+    .individual .prudle-item-type{
+      background:#e8faf2;
+      color:#08744f;
+    }
+    .homework .prudle-item-type{
+      background:#fff4dc;
+      color:#9a5a00;
+    }
+    .result .prudle-item-type{
+      background:#eaf3ff;
+      color:#164478;
+    }
+    .prudle-item-title{
+      color:#173a63;
+      font-size:14px;
+      font-weight:900;
+      line-height:1.55;
+    }
+    .prudle-item-course{
+      margin-top:6px;
+      color:#70849a;
+      font-size:11px;
+      font-weight:700;
+      line-height:1.7;
+    }
+    .prudle-item-meta{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      margin-top:9px;
+    }
+    .prudle-item-meta span{
+      padding:5px 8px;
+      border-radius:999px;
+      background:#f1f5f9;
+      color:#52677d;
+      font-size:10px;
+      font-weight:800;
+    }
+    .prudle-item-score{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-top:10px;
+      padding:10px 11px;
+      border-radius:12px;
+      background:#f8fbff;
+      border:1px solid #e6edf6;
+    }
+    .prudle-item-score strong{
+      color:#164478;
+      font-size:17px;
+      direction:ltr;
+    }
+    .prudle-item-score small{
+      color:#75889d;
+      font-weight:800;
+    }
+    .prudle-item-action{
+      display:flex;
+      justify-content:flex-end;
+      margin-top:10px;
+    }
+    .prudle-item-action a{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      border-radius:11px;
+      padding:9px 11px;
+      background:#164478;
+      color:#fff;
+      font-size:11px;
+      font-weight:900;
+    }
+    .prudle-empty-smart{
+      padding:28px 15px;
+      border:1px dashed #b8cadd;
+      border-radius:17px;
+      background:#fff;
+      color:#71869b;
+      text-align:center;
+      line-height:1.8;
+      font-size:12px;
+      font-weight:800;
+    }
+    .prudle-loading-smart{
+      padding:22px;
+      text-align:center;
+      color:#61788f;
+      font-weight:800;
+    }
+    .prudle-new-toast{
+      position:fixed;
+      left:92px;
+      bottom:30px;
+      z-index:9690;
+      max-width:min(360px,calc(100vw - 120px));
+      background:#143f74;
+      color:#fff;
+      border-radius:14px;
+      padding:11px 14px;
+      font-size:12px;
+      font-weight:800;
+      box-shadow:0 12px 28px rgba(0,0,0,.20);
+      opacity:0;
+      transform:translateY(10px);
+      pointer-events:none;
+      transition:.25s;
+    }
+    .prudle-new-toast.show{
+      opacity:1;
+      transform:none;
+    }
+    @media(max-width:760px){
+      .prudle-smart-tools{grid-template-columns:1fr}
+      .prudle-center-summary{grid-template-columns:repeat(3,1fr)}
+      .prudle-notification-fab{left:12px;bottom:14px}
+      .prudle-new-toast{left:78px;bottom:20px}
+      .prudle-center-panel{width:100%}
+    }
+  </style>
+
+</head>
+<body>
+
+  <div class="page-shell">
+    <div class="portal-wrap">
+
+      <!-- HERO -->
+      <section class="hero">
+        <div class="hero-top">
+          <div class="brand-box">
+            <div class="logo-ring">
+              <div class="logo-inner">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJprpZXU4pTSCYXKhzWCpqdZ_mnPHMwqsACA&s" alt="Prudle Logo">
+              </div>
+            </div>
+
+            <div class="hero-text">
+              <h1 class="hero-title">بوابة برودل التعليمية</h1>
+              <p class="hero-subtitle">
+                منصة موحدة للوصول إلى الفصول المباشرة، الملفات، الخطة الأكاديمية، والمكتبة الإلكترونية
+                بتجربة أنيقة وواضحة وسهلة للطالب.
+              </p>
+            </div>
+          </div>
+
+          <div class="hero-badge">✨ Prudle Smart Learning Portal</div>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat-card">
+            <div class="stat-label">الخدمات التعليمية</div>
+            <div class="stat-value">4+</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">الفصول المباشرة</div>
+            <div class="stat-value">Zoom</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">الوصول السريع</div>
+            <div class="stat-value"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MAIN -->
+      <main class="content">
+
+        <!-- SMART STUDENT CENTER -->
+        <section id="prudleStudentSmartTools" class="prudle-smart-tools" style="display:none">
+          <div class="prudle-smart-card notification" onclick="openPrudleStudentCenter('notifications')">
+            <div class="prudle-smart-icon"><i class="fa-solid fa-bell"></i></div>
+            <div class="prudle-smart-copy">
+              <b>الإشعارات والمهام الجديدة</b>
+              <span id="prudleSmartNotificationText">يتم التحقق من النشاطات الفردية والواجبات...</span>
+            </div>
+            <div id="prudleSmartNotificationCount" class="prudle-smart-count zero">0</div>
+          </div>
+
+          <div class="prudle-smart-card history" onclick="openPrudleStudentCenter('history')">
+            <div class="prudle-smart-icon"><i class="fa-solid fa-chart-line"></i></div>
+            <div class="prudle-smart-copy">
+              <b>تفاصيل الواجبات والنشاطات</b>
+              <span id="prudleSmartHistoryText">درجاتك ومحاولاتك السابقة في مكان واحد.</span>
+            </div>
+            <div id="prudleSmartHistoryCount" class="prudle-smart-count zero">0</div>
+          </div>
+        </section>
+
+
+        <!-- ZOOM MAIN -->
+        <section class="zoom-feature">
+          <div class="zoom-left">
+            <div class="zoom-kicker">□ القسم المباشر</div>
+            <h2 class="zoom-title">قسم الأونلاين (ZOOM)</h2>
+            <p class="zoom-desc">
+              ادخل إلى الفصول الافتراضية بسهولة من خلال واجهة واضحة وسريعة. يمكن ربط هذا القسم
+              بصفحة البث المباشر أو بصفحة اختيار الدورة ثم بدء الاجتماع عبر Zoom.
+            </p>
+
+            <div class="zoom-actions">
+              <a class="btn-main" href="https://www.prudle-education.com/student-zoom">
+                دخول الفصول المباشرة
+              </a>
+
+              <a class="btn-light" href="https://www.prudle-education.com/1581158015861605160215931583---1571160816061604157516101606.html">
+                احجز بقسم الأونلاين
+              </a>
+            </div>
+          </div>
+
+          <div class="zoom-right">
+            <div class="zoom-mini-grid">
+              <div class="zoom-mini">
+                <h4>بدء سريع</h4>
+                <p>واجهة مناسبة للطالب للوصول إلى الحصة المباشرة بدون ازدحام أو تداخل في العناصر.</p>
+              </div>
+
+              <div class="zoom-mini">
+                <h4>وضوح كامل</h4>
+                <p>أداء عالي وفعاليات وانشطة ترفيهية لتوضيح المعلومة بسهولة.</p>
+              </div>
+
+              <div class="zoom-mini">
+                <h4>تسجيلات الفيديو</h4>
+                <p>يمكنك متابعة تسجيلات الفيديو في أي وقت واي مكان.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SERVICES -->
+        <section>
+          <div class="section-head">
+            <h3 class="section-title">الخدمات الرئيسية</h3>
+            <div class="section-note"> </div>
+          </div>
+
+          <div class="services-grid">
+
+            <a class="service-card service-academic"
+               href="https://www.prudle-education.com/full-studentss-report">
+              <div class="service-icon icon-academic"></div>
+              <h4 class="service-title">الخطة الأكاديمية والدرجات</h4>
+              <p class="service-desc">
+                متابعة الخطة الأكاديمية للدورات العامة والتقييم النهائي بواجهة واضحة وسريعة.
+              </p>
+              <span class="service-link">الدخول إلى القسم ←</span>
+            </a>
+<a class="service-card service-files"
+   href="javascript:void(0)"
+   onclick="goHomework()">
+              <div class="service-icon icon-files"></div>
+              <h4 class="service-title">الواجبات والاختبارات</h4>
+              <p class="service-desc">
+                الوصول إلى الواجبات والروابط التعليمية والملفات المرفوعة للدورات بشكل منظم.
+              </p>
+              <span class="service-link">فتح القسم ←</span>
+            </a>
+
+            <a class="service-card service-library"
+               href="https://www.prudle-education.com/prudle-bookstore-student">
+              <div class="service-icon icon-library"></div>
+              <h4 class="service-title">المكتبة الإلكترونية</h4>
+              <p class="service-desc">
+                تصفح مصادر ومحتويات تعليمية إضافية ضمن مكتبة برودل الإلكترونية.
+              </p>
+              <span class="service-link">زيارة المكتبة ←</span>
+            </a>
+<a class="service-card service-activities"
+   href="javascript:void(0)" onclick="goActivities()">
+
+  <div class="service-icon icon-activities"></div>
+
+  <h4 class="service-title">
+    النشاطات
+  </h4>
+
+  <p class="service-desc">
+    الدخول إلى الأنشطة التعليمية والترفيهية، وممارسة الأنشطة الخاصة بالدورات بطريقة تفاعلية.
+  </p>
+
+  <span class="service-link">
+    فتح النشاطات ←
+  </span>
+
+</a>
+
+            <a class="service-card service-chat"
+               href="https://www.prudle-education.com/students-conversation-results">
+              <div class="service-icon icon-chat"></div>
+              <h4 class="service-title">دورة المحادثة الخاصة</h4>
+              <p class="service-desc">
+                قسم مخصص للمحادثة والتفاعل مع محتوى الدورة بطريقة منظمة وسهلة الوصول.
+              </p>
+              <span class="service-link">الدخول الآن ←</span>
+            </a>
+
+          </div>
+        </section>
+
+        <!-- BRANCHES -->
+        <section class="branches-wrap">
+          <div class="section-head">
+            <h3 class="section-title">حجز الدورات حسب الفرع</h3>
+            <div class="section-note">احجز دورتك الان</div>
+          </div>
+
+          <div class="branches-grid">
+
+            <a class="branch-card branch-men"
+               href="https://www.prudle-education.com/1581158015861605160215931583--157516041581160515831575160616101577--1585158015751604.html">
+              <span class="branch-label">فرع رجال</span>
+              <h4 class="branch-title">فرع الحمدانية – رجال</h4>
+              <p class="branch-desc">
+                الانتقال إلى صفحة حجز الدورات الخاصة بفرع الحمدانية للرجال.
+              </p>
+            </a>
+
+            <a class="branch-card branch-women"
+               href="https://www.prudle-education.com/1581158015861605160215931583--157516041581160515831575160616101577-15871610158315751578.html">
+              <span class="branch-label">فرع سيدات وأطفال</span>
+              <h4 class="branch-title">فرع الحمدانية – سيدات وأطفال</h4>
+              <p class="branch-desc">
+                الوصول إلى صفحة التسجيل والحجز الخاصة بالسيدات والأطفال.
+              </p>
+            </a>
+
+            <a class="branch-card branch-zahra"
+               href="https://www.prudle-education.com/1581158015861605160215931583---157516041586160715851577.html">
+              <span class="branch-label">فرع الزهرة</span>
+              <h4 class="branch-title">فرع الزهرة</h4>
+              <p class="branch-desc">
+                عرض صفحة الحجز التابعة لفرع الزهرة ضمن بوابة برودل التعليمية.
+              </p>
+            </a>
+
+            <a class="branch-card branch-online"
+               href="https://www.prudle-education.com/1581158015861605160215931583---1571160816061604157516101606.html">
+              <span class="branch-label">قسم الأونلاين</span>
+              <h4 class="branch-title">قسم الأونلاين (Zoom)</h4>
+              <p class="branch-desc">
+                صفحة مخصصة للدورات الأونلاين والوصول إلى المسارات التعليمية الافتراضية.
+              </p>
+            </a>
+
+          </div>
+        </section>
+
+        <div class="footer-note">
+          Prudle Education System 2026 — 
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Student Notification FAB -->
+  <button id="prudleStudentNotificationFab"
+          class="prudle-notification-fab"
+          type="button"
+          title="الإشعارات"
+          onclick="openPrudleStudentCenter('notifications')">
+    <i class="fa-solid fa-bell"></i>
+    <span id="prudleStudentNotificationFabCount" class="count hidden">0</span>
+  </button>
+
+  <div id="prudleStudentCenterBackdrop"
+       class="prudle-center-backdrop"
+       onclick="closePrudleStudentCenter()"></div>
+
+  <aside id="prudleStudentCenterPanel"
+         class="prudle-center-panel"
+         aria-hidden="true">
+    <div class="prudle-center-head">
+      <div>
+        <h3><i class="fa-solid fa-graduation-cap"></i> مركز الطالب الذكي</h3>
+        <p id="prudleStudentCenterName">الإشعارات والدرجات</p>
+      </div>
+      <button type="button"
+              class="prudle-center-close"
+              onclick="closePrudleStudentCenter()">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="prudle-center-tabs">
+      <button id="prudleNotificationsTabBtn"
+              class="prudle-center-tab active"
+              type="button"
+              onclick="switchPrudleStudentTab('notifications')">
+        <i class="fa-solid fa-bell"></i>
+        الإشعارات
+      </button>
+      <button id="prudleHistoryTabBtn"
+              class="prudle-center-tab"
+              type="button"
+              onclick="switchPrudleStudentTab('history')">
+        <i class="fa-solid fa-chart-column"></i>
+        الدرجات والسجل
+      </button>
+    </div>
+
+    <section id="prudleNotificationsTab" class="prudle-tab-panel active">
+      <div class="prudle-center-summary">
+        <div class="prudle-summary-box">
+          <b id="prudleIndividualOpenCount">0</b>
+          <span>Individual</span>
+        </div>
+        <div class="prudle-summary-box">
+          <b id="prudleHomeworkOpenCount">0</b>
+          <span>واجبات</span>
+        </div>
+        <div class="prudle-summary-box">
+          <b id="prudleTotalOpenCount">0</b>
+          <span>المجموع</span>
+        </div>
+      </div>
+      <div id="prudleNotificationFeed" class="prudle-feed">
+        <div class="prudle-loading-smart">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          جاري تحميل الإشعارات...
+        </div>
+      </div>
+    </section>
+
+    <section id="prudleHistoryTab" class="prudle-tab-panel">
+      <div class="prudle-center-summary">
+        <div class="prudle-summary-box">
+          <b id="prudleHomeworkDoneCount">0</b>
+          <span>واجبات محلولة</span>
+        </div>
+        <div class="prudle-summary-box">
+          <b id="prudleActivityDoneCount">0</b>
+          <span>نشاطات محلولة</span>
+        </div>
+        <div class="prudle-summary-box">
+          <b id="prudleAverageGrade">0%</b>
+          <span>متوسط الأداء</span>
+        </div>
+      </div>
+      <div id="prudleHistoryFeed" class="prudle-feed">
+        <div class="prudle-loading-smart">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          جاري تحميل درجاتك...
+        </div>
+      </div>
+    </section>
+  </aside>
+
+  <div id="prudleStudentNewToast" class="prudle-new-toast"></div>
+
+<script>
+(function(){
+
+  const params = new URLSearchParams(window.location.search);
+
+  const sidFromUrl =
+    params.get("studentID") ||
+    params.get("student_iqama") ||
+    "";
+
+  const sidFromStorage =
+    localStorage.getItem("studentID") ||
+    localStorage.getItem("student_iqama") ||
+    "";
+
+  const studentID = String(sidFromUrl || sidFromStorage).trim();
+
+  if(studentID){
+    localStorage.removeItem("studentLoggedOut");
+    localStorage.setItem("studentID", studentID);
+    localStorage.setItem("student_iqama", studentID);
+    localStorage.setItem("studentLoginDate", new Date().toDateString());
+  }
+
+  window.goHomework = function(){
+
+    const id =
+      localStorage.getItem("studentID") ||
+      localStorage.getItem("student_iqama") ||
+      studentID ||
+      "";
+
+    if(!id){
+      location.replace("https://www.prudle-education.com/log-in-out");
+      return;
+    }
+
+    location.href =
+      "https://www.prudle-education.com/homework-students?studentID=" +
+      encodeURIComponent(id);
+  };
+
+})();
+</script>
+
+<script id="prudle-student-smart-center-script">
+(function(){
+  const FIREBASE_CONFIG = {
+    apiKey:"AIzaSyCCFBvZosI8dwShZjxvZzI-SU5igEbcOKk",
+    authDomain:"prudle-system.firebaseapp.com",
+    projectId:"prudle-system"
+  };
+
+  if(!window.firebase){
+    console.warn("Firebase SDK is not available.");
+    return;
+  }
+
+  if(!firebase.apps.length){
+    firebase.initializeApp(FIREBASE_CONFIG);
+  }
+
+  const db = firebase.firestore();
+
+  const state = {
+    studentKey:"",
+    studentName:"",
+    studentDocs:[],
+    courseIds:new Set(),
+    openIndividual:[],
+    openHomework:[],
+    homeworkResults:[],
+    activityResults:[],
+    examMap:new Map(),
+    lastNotificationSignature:"",
+    individualUnsubscribe:null,
+    refreshTimer:null
+  };
+
+  const safe = value => String(value ?? "").trim();
+  const escHtml = value => safe(value)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+
+  function getStudentKey(){
+    const params = new URLSearchParams(location.search);
+    return safe(
+      params.get("studentID") ||
+      params.get("student_iqama") ||
+      localStorage.getItem("studentID") ||
+      localStorage.getItem("student_iqama") ||
+      ""
+    );
+  }
+
+  function timestampValue(value){
+    if(!value) return 0;
+    if(typeof value.toMillis === "function") return value.toMillis();
+    if(typeof value.seconds === "number") return value.seconds * 1000;
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function isHomeworkExam(exam){
+    const skill = safe(exam?.examSkill).toLowerCase();
+    if(skill === "homework") return true;
+    if(exam?.isHomework === true) return true;
+    const category = safe(
+      exam?.examCategory ||
+      exam?.examType ||
+      exam?.category
+    ).toLowerCase();
+    return category === "homework";
+  }
+
+  function visibleQuestionIds(exam,courseId){
+    const map =
+      exam?.visibleQuestionsByCourse &&
+      typeof exam.visibleQuestionsByCourse === "object"
+        ? exam.visibleQuestionsByCourse
+        : {};
+
+    if(!Object.prototype.hasOwnProperty.call(map,courseId)){
+      return [];
+    }
+
+    return Array.isArray(map[courseId])
+      ? map[courseId].map(safe).filter(Boolean)
+      : [];
+  }
+
+  function resultMatchesStudent(row){
+    const key = state.studentKey;
+    const docIds = new Set(
+      state.studentDocs.map(item=>safe(item.id)).filter(Boolean)
+    );
+
+    return (
+      safe(row.studentIqama) === key ||
+      safe(row.studentID) === key ||
+      safe(row.studentId) === key ||
+      safe(row.studentDocId) === key ||
+      docIds.has(safe(row.studentId)) ||
+      docIds.has(safe(row.studentDocId)) ||
+      safe(row.participantId) === key ||
+      docIds.has(safe(row.participantId))
+    );
+  }
+
+  async function loadStudentContext(){
+    state.studentKey = getStudentKey();
+
+    if(!state.studentKey){
+      return false;
+    }
+
+    const studentSnap = await db
+      .collection("students")
+      .where("iqama","==",state.studentKey)
+      .get();
+
+    state.studentDocs = studentSnap.docs.map(doc=>({
+      id:doc.id,
+      ...doc.data()
+    }));
+
+    if(!state.studentDocs.length){
+      return false;
+    }
+
+    state.studentName =
+      safe(state.studentDocs[0]?.name) ||
+      "Student";
+
+    state.courseIds = new Set(
+      state.studentDocs
+        .map(item=>safe(item.courseId))
+        .filter(Boolean)
+    );
+
+    const smartTools =
+      document.getElementById("prudleStudentSmartTools");
+    if(smartTools) smartTools.style.display = "grid";
+
+    document
+      .getElementById("prudleStudentNotificationFab")
+      ?.classList.add("show");
+
+    const centerName =
+      document.getElementById("prudleStudentCenterName");
+    if(centerName){
+      centerName.textContent =
+        state.studentName + " — الإشعارات والدرجات";
+    }
+
+    return true;
+  }
+
+  async function readStudentExamResults(){
+    let docs = [];
+
+    try{
+      const snap = await db
+        .collection("results")
+        .where("studentIqama","==",state.studentKey)
+        .get();
+
+      docs = snap.docs.map(doc=>({
+        id:doc.id,
+        ...doc.data()
+      }));
+    }catch(error){
+      console.warn("Result query fallback:",error);
+      const snap = await db.collection("results").get();
+      docs = snap.docs
+        .map(doc=>({id:doc.id,...doc.data()}))
+        .filter(resultMatchesStudent);
+    }
+
+    return docs;
+  }
+
+  async function readStudentActivityResults(){
+    let docs = [];
+
+    try{
+      const snap = await db
+        .collection("FunActivityResults")
+        .where("participantId","==",state.studentKey)
+        .get();
+
+      docs = snap.docs.map(doc=>({
+        id:doc.id,
+        ...doc.data()
+      }));
+    }catch(error){
+      console.warn("Activity result query fallback:",error);
+      const snap = await db.collection("FunActivityResults").get();
+      docs = snap.docs
+        .map(doc=>({id:doc.id,...doc.data()}))
+        .filter(resultMatchesStudent);
+    }
+
+    return docs;
+  }
+
+  async function loadHomeworkState(){
+    const [examSnap,resultRows] = await Promise.all([
+      db.collection("exams").get(),
+      readStudentExamResults()
+    ]);
+
+    state.examMap = new Map(
+      examSnap.docs.map(doc=>[
+        doc.id,
+        {id:doc.id,...doc.data()}
+      ])
+    );
+
+    const resultKeySet = new Set(
+      resultRows.map(row=>
+        `${safe(row.examId)}__${safe(row.courseId)}`
+      )
+    );
+
+    const homeworkRows = [];
+
+    state.examMap.forEach(exam=>{
+      if(!isHomeworkExam(exam)) return;
+
+      state.courseIds.forEach(courseId=>{
+        if(visibleQuestionIds(exam,courseId).length === 0){
+          return;
+        }
+
+        const done =
+          resultKeySet.has(
+            `${safe(exam.id)}__${safe(courseId)}`
+          );
+
+        homeworkRows.push({
+          ...exam,
+          courseId,
+          done
+        });
+      });
+    });
+
+    state.openHomework =
+      homeworkRows.filter(item=>!item.done);
+
+    state.homeworkResults =
+      resultRows.filter(row=>{
+        const exam = state.examMap.get(safe(row.examId));
+        return exam && isHomeworkExam(exam);
+      });
+  }
+
+  async function loadActivityHistory(){
+    const rows = await readStudentActivityResults();
+
+    state.activityResults = rows
+      .filter(row=>{
+        const courseId =
+          safe(
+            row.courseId ||
+            row.participantCourseId ||
+            row.sourceCourseId
+          );
+
+        return (
+          !state.courseIds.size ||
+          !courseId ||
+          state.courseIds.has(courseId)
+        );
+      })
+      .sort((a,b)=>
+        timestampValue(b.createdAt || b.updatedAt) -
+        timestampValue(a.createdAt || a.updatedAt)
+      );
+  }
+
+  function listenIndividualSessions(){
+    if(state.individualUnsubscribe){
+      state.individualUnsubscribe();
+      state.individualUnsubscribe = null;
+    }
+
+    state.individualUnsubscribe =
+      db.collection("FunActivityLiveSessions")
+        .onSnapshot(snapshot=>{
+          const rows = snapshot.docs
+            .map(doc=>({id:doc.id,...doc.data()}))
+            .filter(item=>
+              safe(item.mode).toLowerCase() === "individual" &&
+              safe(item.status).toLowerCase() === "active" &&
+              item.studentVisible !== false &&
+              state.courseIds.has(safe(item.courseId))
+            )
+            .sort((a,b)=>
+              timestampValue(b.updatedAt || b.startedAt) -
+              timestampValue(a.updatedAt || a.startedAt)
+            );
+
+          state.openIndividual = rows;
+          renderAll();
+          maybeToastNewItems();
+        },error=>{
+          console.warn("Individual notifications:",error);
+        });
+  }
+
+  function formatScore(score,total,percent){
+    const s = Number(score || 0);
+    const t = Number(total || 0);
+    const p = Number(percent || 0);
+
+    return {
+      scoreText: t > 0 ? `${s} / ${t}` : String(s),
+      percentText: Number.isFinite(p) ? `${Math.round(p)}%` : ""
+    };
+  }
+
+  function notificationLink(type,item){
+    const id = encodeURIComponent(state.studentKey);
+
+    if(type === "individual"){
+      return (
+        "https://www.prudle-education.com/studentss-activity" +
+        "?studentID=" + id +
+        "&activityId=" + encodeURIComponent(safe(item.activityId)) +
+        "&courseId=" + encodeURIComponent(safe(item.courseId))
+      );
+    }
+
+    return (
+      "https://www.prudle-education.com/homework-students" +
+      "?studentID=" + id
+    );
+  }
+
+  function renderNotifications(){
+    const feed =
+      document.getElementById("prudleNotificationFeed");
+
+    if(!feed) return;
+
+    const rows = [];
+
+    state.openIndividual.forEach(item=>{
+      rows.push(`
+        <article class="prudle-feed-item individual">
+          <div class="prudle-item-top">
+            <div>
+              <div class="prudle-item-title">
+                ${escHtml(item.activityTitle || "Individual Activity")}
+              </div>
+              <div class="prudle-item-course">
+                ${escHtml(item.courseName || "الدورة")}
+                ${item.trainerName ? ` • ${escHtml(item.trainerName)}` : ""}
+              </div>
+            </div>
+            <span class="prudle-item-type">
+              <i class="fa-solid fa-circle" style="font-size:7px"></i>
+              Individual مفتوح
+            </span>
+          </div>
+          <div class="prudle-item-meta">
+            ${item.period ? `<span><i class="fa-regular fa-clock"></i> ${escHtml(item.period)}</span>` : ""}
+            ${item.branch ? `<span><i class="fa-solid fa-location-dot"></i> ${escHtml(item.branch)}</span>` : ""}
+            ${item.totalQuestions ? `<span>${Number(item.totalQuestions)} سؤال</span>` : ""}
+          </div>
+          <div class="prudle-item-action">
+            <a href="${notificationLink("individual",item)}">
+              الدخول إلى النشاط
+              <i class="fa-solid fa-arrow-left"></i>
+            </a>
+          </div>
+        </article>
+      `);
+    });
+
+    state.openHomework.forEach(item=>{
+      rows.push(`
+        <article class="prudle-feed-item homework">
+          <div class="prudle-item-top">
+            <div>
+              <div class="prudle-item-title">
+                ${escHtml(item.title || item.examTitle || "واجب")}
+              </div>
+              <div class="prudle-item-course">
+                واجب ظاهر ومتاح حاليًا
+              </div>
+            </div>
+            <span class="prudle-item-type">
+              <i class="fa-solid fa-book-open"></i>
+              واجب
+            </span>
+          </div>
+          <div class="prudle-item-meta">
+            ${item.duration ? `<span><i class="fa-regular fa-clock"></i> ${Math.round(Number(item.duration)/60)} دقيقة</span>` : ""}
+          </div>
+          <div class="prudle-item-action">
+            <a href="${notificationLink("homework",item)}">
+              فتح الواجب
+              <i class="fa-solid fa-arrow-left"></i>
+            </a>
+          </div>
+        </article>
+      `);
+    });
+
+    feed.innerHTML = rows.length
+      ? rows.join("")
+      : `
+        <div class="prudle-empty-smart">
+          <i class="fa-regular fa-circle-check" style="font-size:26px;color:#16a34a"></i><br>
+          لا توجد واجبات أو نشاطات Individual جديدة متاحة حاليًا.
+        </div>
+      `;
+  }
+
+  function renderHistory(){
+    const feed =
+      document.getElementById("prudleHistoryFeed");
+
+    if(!feed) return;
+
+    const rows = [];
+
+    state.homeworkResults
+      .slice()
+      .sort((a,b)=>
+        timestampValue(b.createdAt) -
+        timestampValue(a.createdAt)
+      )
+      .forEach(item=>{
+        const score =
+          formatScore(
+            item.score,
+            item.totalDegree,
+            item.percent
+          );
+
+        rows.push(`
+          <article class="prudle-feed-item result">
+            <div class="prudle-item-top">
+              <div>
+                <div class="prudle-item-title">
+                  ${escHtml(item.examTitle || "واجب")}
+                </div>
+                <div class="prudle-item-course">
+                  واجب مكتمل
+                </div>
+              </div>
+              <span class="prudle-item-type">
+                <i class="fa-solid fa-check"></i>
+                Homework
+              </span>
+            </div>
+            <div class="prudle-item-score">
+              <div>
+                <small>الدرجة</small>
+                <strong>${escHtml(score.scoreText)}</strong>
+              </div>
+              <strong>${escHtml(score.percentText)}</strong>
+            </div>
+          </article>
+        `);
+      });
+
+    state.activityResults.forEach(item=>{
+      const score =
+        formatScore(
+          item.score ?? item.totalCorrectAnswers,
+          item.total ?? item.totalAnswered,
+          item.percent
+        );
+
+      rows.push(`
+        <article class="prudle-feed-item result">
+          <div class="prudle-item-top">
+            <div>
+              <div class="prudle-item-title">
+                ${escHtml(item.activityTitle || "نشاط")}
+              </div>
+              <div class="prudle-item-course">
+                ${escHtml(item.courseName || item.participantCourseName || "")}
+              </div>
+            </div>
+            <span class="prudle-item-type">
+              <i class="fa-solid fa-puzzle-piece"></i>
+              Activity
+            </span>
+          </div>
+
+          <div class="prudle-item-meta">
+            ${item.group ? `<span>${escHtml(item.group)}</span>` : ""}
+            ${item.trainerName ? `<span>${escHtml(item.trainerName)}</span>` : ""}
+          </div>
+
+          <div class="prudle-item-score">
+            <div>
+              <small>الدرجة</small>
+              <strong>${escHtml(score.scoreText)}</strong>
+            </div>
+            <strong>${escHtml(score.percentText)}</strong>
+          </div>
+        </article>
+      `);
+    });
+
+    feed.innerHTML = rows.length
+      ? rows.join("")
+      : `
+        <div class="prudle-empty-smart">
+          لا توجد نتائج واجبات أو نشاطات محفوظة لهذا الطالب حتى الآن.
+        </div>
+      `;
+  }
+
+  function renderCounters(){
+    const individual = state.openIndividual.length;
+    const homework = state.openHomework.length;
+    const total = individual + homework;
+    const history =
+      state.homeworkResults.length +
+      state.activityResults.length;
+
+    const setText = (id,value)=>{
+      const el = document.getElementById(id);
+      if(el) el.textContent = String(value);
+    };
+
+    setText("prudleIndividualOpenCount",individual);
+    setText("prudleHomeworkOpenCount",homework);
+    setText("prudleTotalOpenCount",total);
+    setText("prudleHomeworkDoneCount",state.homeworkResults.length);
+    setText("prudleActivityDoneCount",state.activityResults.length);
+
+    const count = document.getElementById("prudleSmartNotificationCount");
+    if(count){
+      count.textContent = String(total);
+      count.classList.toggle("zero",total === 0);
+    }
+
+    const historyCount = document.getElementById("prudleSmartHistoryCount");
+    if(historyCount){
+      historyCount.textContent = String(history);
+      historyCount.classList.toggle("zero",history === 0);
+    }
+
+    const fab = document.getElementById("prudleStudentNotificationFab");
+    const fabCount = document.getElementById("prudleStudentNotificationFabCount");
+
+    if(fab){
+      fab.classList.toggle("has-items",total > 0);
+    }
+    if(fabCount){
+      fabCount.textContent = String(total);
+      fabCount.classList.toggle("hidden",total === 0);
+    }
+
+    const note = document.getElementById("prudleSmartNotificationText");
+    if(note){
+      note.textContent = total
+        ? `لديك ${total} مهمة جديدة: ${individual} نشاط Individual و ${homework} واجب.`
+        : "لا توجد مهام جديدة حاليًا.";
+    }
+
+    const historyText = document.getElementById("prudleSmartHistoryText");
+    if(historyText){
+      historyText.textContent = history
+        ? `لديك ${history} نتيجة محفوظة للواجبات والنشاطات.`
+        : "ستظهر هنا درجات واجباتك ونشاطاتك بعد الحل.";
+    }
+
+    const percentages = [
+      ...state.homeworkResults.map(item=>Number(item.percent)),
+      ...state.activityResults.map(item=>Number(item.percent))
+    ].filter(Number.isFinite);
+
+    const avg = percentages.length
+      ? Math.round(
+          percentages.reduce((sum,value)=>sum+value,0) /
+          percentages.length
+        )
+      : 0;
+
+    setText("prudleAverageGrade",avg + "%");
+  }
+
+  function renderAll(){
+    renderCounters();
+    renderNotifications();
+    renderHistory();
+  }
+
+  function notificationSignature(){
+    return [
+      ...state.openIndividual.map(item=>"i:"+safe(item.id)),
+      ...state.openHomework.map(item=>"h:"+safe(item.id)+":"+safe(item.courseId))
+    ].sort().join("|");
+  }
+
+  function maybeToastNewItems(){
+    const signature = notificationSignature();
+
+    if(!state.lastNotificationSignature){
+      state.lastNotificationSignature = signature;
+      return;
+    }
+
+    if(signature && signature !== state.lastNotificationSignature){
+      const toast = document.getElementById("prudleStudentNewToast");
+      if(toast){
+        toast.innerHTML =
+          `<i class="fa-solid fa-bell"></i> لديك نشاط أو واجب جديد متاح الآن.`;
+        toast.classList.add("show");
+        setTimeout(()=>toast.classList.remove("show"),5000);
+      }
+    }
+
+    state.lastNotificationSignature = signature;
+  }
+
+  async function refreshNonRealtimeData(){
+    try{
+      await Promise.all([
+        loadHomeworkState(),
+        loadActivityHistory()
+      ]);
+      renderAll();
+      maybeToastNewItems();
+    }catch(error){
+      console.error("Student smart center:",error);
+    }
+  }
+
+  window.openPrudleStudentCenter = function(tab="notifications"){
+    if(!state.studentKey){
+      location.href =
+        "https://www.prudle-education.com/log-in-out";
+      return;
+    }
+
+    document
+      .getElementById("prudleStudentCenterPanel")
+      ?.classList.add("open");
+
+    document
+      .getElementById("prudleStudentCenterBackdrop")
+      ?.classList.add("open");
+
+    switchPrudleStudentTab(tab);
+  };
+
+  window.closePrudleStudentCenter = function(){
+    document
+      .getElementById("prudleStudentCenterPanel")
+      ?.classList.remove("open");
+
+    document
+      .getElementById("prudleStudentCenterBackdrop")
+      ?.classList.remove("open");
+  };
+
+  window.switchPrudleStudentTab = function(tab){
+    const notifications = tab !== "history";
+
+    document
+      .getElementById("prudleNotificationsTabBtn")
+      ?.classList.toggle("active",notifications);
+
+    document
+      .getElementById("prudleHistoryTabBtn")
+      ?.classList.toggle("active",!notifications);
+
+    document
+      .getElementById("prudleNotificationsTab")
+      ?.classList.toggle("active",notifications);
+
+    document
+      .getElementById("prudleHistoryTab")
+      ?.classList.toggle("active",!notifications);
+  };
+
+  window.goActivities = function(){
+    const id = getStudentKey();
+
+    if(!id){
+      location.href =
+        "https://www.prudle-education.com/log-in-out";
+      return;
+    }
+
+    location.href =
+      "https://www.prudle-education.com/studentss-activity?studentID=" +
+      encodeURIComponent(id);
+  };
+
+  async function boot(){
+    try{
+      const ok = await loadStudentContext();
+
+      if(!ok){
+        return;
+      }
+
+      await refreshNonRealtimeData();
+      listenIndividualSessions();
+
+      state.refreshTimer = setInterval(
+        refreshNonRealtimeData,
+        60000
+      );
+    }catch(error){
+      console.error("Unable to start student notifications:",error);
+    }
+  }
+
+  window.addEventListener("load",boot);
+})();
+</script>
+
+</body>
+</html>
