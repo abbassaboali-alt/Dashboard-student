@@ -1447,21 +1447,19 @@
   }
 
   window.goHomework = function(){
-
-    const id =
+    const id = String(
       localStorage.getItem("studentID") ||
       localStorage.getItem("student_iqama") ||
       studentID ||
-      "";
+      ""
+    ).trim();
 
-    if(!id){
-      location.replace("https://www.prudle-education.com/log-in-out");
-      return;
-    }
-
-    location.href =
-      "https://www.prudle-education.com/homework-students?studentID=" +
-      encodeURIComponent(id);
+    // لا نسجل خروج الطالب إذا لم نجد الرقم في هذه الصفحة.
+    // نفتح صفحة الواجبات مباشرة، وإذا كان الرقم متاحًا نمرره معها.
+    const baseUrl = "https://www.prudle-education.com/homework-students";
+    location.href = id
+      ? baseUrl + "?studentID=" + encodeURIComponent(id)
+      : baseUrl;
   };
 
 })();
@@ -2478,17 +2476,14 @@ window.onload=function(){setTimeout(function(){window.print();},300);};
   };
 
   window.goActivities = function(){
-    const id = getStudentKey();
+    const id = String(getStudentKey() || "").trim();
 
-    if(!id){
-      location.href =
-        "https://www.prudle-education.com/log-in-out";
-      return;
-    }
-
-    location.href =
-      "https://www.prudle-education.com/studentss-activity?studentID=" +
-      encodeURIComponent(id);
+    // لا نسجل خروج الطالب إذا لم نجد الرقم في هذه الصفحة.
+    // نفتح صفحة النشاطات مباشرة، وإذا كان الرقم متاحًا نمرره معها.
+    const baseUrl = "https://www.prudle-education.com/studentss-activity";
+    location.href = id
+      ? baseUrl + "?studentID=" + encodeURIComponent(id)
+      : baseUrl;
   };
 
   async function boot(){
