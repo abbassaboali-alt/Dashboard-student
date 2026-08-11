@@ -1120,7 +1120,7 @@
             <div class="prudle-smart-icon"><i class="fa-solid fa-bell"></i></div>
             <div class="prudle-smart-copy">
               <b>الإشعارات والمهام الجديدة</b>
-              <span id="prudleSmartNotificationText">يتم التحقق من النشاطات الفردية والواجبات...</span>
+              <span id="prudleSmartNotificationText">يتم التحقق من النشاطات والواجبات والكويزات...</span>
             </div>
             <div id="prudleSmartNotificationCount" class="prudle-smart-count zero">0</div>
           </div>
@@ -1128,7 +1128,7 @@
           <div class="prudle-smart-card history" onclick="openPrudleStudentCenter('history')">
             <div class="prudle-smart-icon"><i class="fa-solid fa-chart-line"></i></div>
             <div class="prudle-smart-copy">
-              <b>تفاصيل الواجبات والنشاطات</b>
+              <b>تفاصيل الواجبات والكويزات والنشاطات</b>
               <span id="prudleSmartHistoryText">درجاتك ومحاولاتك السابقة في مكان واحد.</span>
             </div>
             <div id="prudleSmartHistoryCount" class="prudle-smart-count zero">0</div>
@@ -1357,7 +1357,7 @@
         </div>
         <div class="prudle-summary-box">
           <b id="prudleHomeworkOpenCount">0</b>
-          <span>واجبات</span>
+          <span>واجب / كويز</span>
         </div>
         <div class="prudle-summary-box">
           <b id="prudleTotalOpenCount">0</b>
@@ -1522,6 +1522,33 @@
     ).toLowerCase();
 
     return category === "homework";
+  }
+
+  function isQuizExam(exam){
+    const category = safe(
+      exam?.examCategory ||
+      exam?.examType ||
+      exam?.category ||
+      exam?.type ||
+      ""
+    ).toLowerCase();
+
+    const skill = safe(exam?.examSkill || "").toLowerCase();
+    const title = safe(
+      exam?.title ||
+      exam?.examTitle ||
+      exam?.name ||
+      ""
+    ).toLowerCase();
+
+    return (
+      category === "quizevaluation" ||
+      category === "quiz" ||
+      category.includes("quiz") ||
+      skill === "quiz" ||
+      title.includes("quiz") ||
+      title.includes("كويز")
+    );
   }
 
   /*
@@ -1789,11 +1816,17 @@
             )
           );
 
-        const homeworkForThisCourse =
+        const explicitHomework =
           isHomeworkExam(exam) ||
           shownHomeworkIds.length > 0;
 
-        if(!homeworkForThisCourse){
+        const explicitQuiz =
+          isQuizExam(exam);
+
+        const assessmentForThisCourse =
+          explicitHomework || explicitQuiz;
+
+        if(!assessmentForThisCourse){
           return;
         }
 
@@ -1808,9 +1841,12 @@
           ...exam,
           courseId,
           done,
+          prudleAssessmentKind:
+            explicitHomework ? "homework" : "quiz",
           homeworkQuestionCount:
-            shownHomeworkIds.length ||
-            shownIds.length
+            explicitHomework
+              ? (shownHomeworkIds.length || shownIds.length)
+              : shownIds.length
         });
       });
     });
@@ -1953,29 +1989,33 @@
     });
 
     state.openHomework.forEach(item=>{
+      const isQuiz = item.prudleAssessmentKind === "quiz";
+      const typeLabel = isQuiz ? "كويز" : "واجب";
+      const iconClass = isQuiz ? "fa-clipboard-question" : "fa-book-open";
+
       rows.push(`
         <article class="prudle-feed-item homework">
           <div class="prudle-item-top">
             <div>
               <div class="prudle-item-title">
-                ${escHtml(item.title || item.examTitle || "واجب")}
+                ${escHtml(item.title || item.examTitle || typeLabel)}
               </div>
               <div class="prudle-item-course">
-                واجب ظاهر ومتاح حاليًا
+                ${typeLabel} ظاهر ومتاح حاليًا — Shown
               </div>
             </div>
             <span class="prudle-item-type">
-              <i class="fa-solid fa-book-open"></i>
-              واجب
+              <i class="fa-solid ${iconClass}"></i>
+              ${typeLabel}
             </span>
           </div>
           <div class="prudle-item-meta">
             ${item.duration ? `<span><i class="fa-regular fa-clock"></i> ${Math.round(Number(item.duration)/60)} دقيقة</span>` : ""}
-            ${item.homeworkQuestionCount ? `<span><i class="fa-solid fa-list-check"></i> ${Number(item.homeworkQuestionCount)} سؤال واجب ظاهر</span>` : ""}
+            ${item.homeworkQuestionCount ? `<span><i class="fa-solid fa-list-check"></i> ${Number(item.homeworkQuestionCount)} سؤال ظاهر</span>` : ""}
           </div>
           <div class="prudle-item-action">
             <a href="${notificationLink("homework",item)}">
-              فتح الواجب
+              فتح ${typeLabel}
               <i class="fa-solid fa-arrow-left"></i>
             </a>
           </div>
@@ -1988,7 +2028,7 @@
       : `
         <div class="prudle-empty-smart">
           <i class="fa-regular fa-circle-check" style="font-size:26px;color:#16a34a"></i><br>
-          لا توجد واجبات أو نشاطات Individual جديدة متاحة حاليًا.
+          لا توجد واجبات أو كويزات أو نشاطات Individual جديدة متاحة حاليًا.
         </div>
       `;
   }
