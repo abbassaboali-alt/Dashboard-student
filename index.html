@@ -1506,14 +1506,48 @@
 
   function isHomeworkExam(exam){
     const skill = safe(exam?.examSkill).toLowerCase();
-    if(skill === "homework") return true;
-    if(exam?.isHomework === true) return true;
+
+    if(skill === "homework"){
+      return true;
+    }
+
+    if(exam?.isHomework === true){
+      return true;
+    }
+
     const category = safe(
       exam?.examCategory ||
       exam?.examType ||
       exam?.category
     ).toLowerCase();
+
     return category === "homework";
+  }
+
+  /*
+    IMPORTANT:
+    In the current Prudle questions system, a homework is often defined
+    at QUESTION level using skill/group = "Homework".
+    The exam document itself may still contain isHomework:false.
+  */
+  function isHomeworkQuestion(question){
+    const skill = safe(
+      question?.skill ||
+      question?.examSkill ||
+      ""
+    ).toLowerCase();
+
+    const group = safe(
+      question?.group ||
+      question?.category ||
+      ""
+    ).toLowerCase();
+
+    return (
+      skill === "homework" ||
+      group === "homework" ||
+      group.includes("homework")
+    );
   }
 
   function visibleQuestionIds(exam,courseId){
@@ -1648,10 +1682,18 @@
   }
 
   async function loadHomeworkState(){
-    const [examSnap,resultRows] = await Promise.all([
-      db.collection("exams").get(),
-      readStudentExamResults()
-    ]);
+    /*
+      Read exams + questions together.
+      This fixes Homework notifications because Prudle currently stores
+      Homework mainly on question.skill / question.group, not necessarily
+      on exam.isHomework.
+    */
+    const [examSnap, questionSnap, resultRows] =
+      await Promise.all([
+        db.collection("exams").get(),
+        db.collection("questions").get(),
+        readStudentExamResults()
+      ]);
 
     state.examMap = new Map(
       examSnap.docs.map(doc=>[
@@ -1660,43 +1702,130 @@
       ])
     );
 
+    /*
+      Build:
+      examId -> Set(homework question ids)
+    */
+    const homeworkQuestionIdsByExam =
+      new Map();
+
+    questionSnap.docs.forEach(doc=>{
+      const q = {
+        id:doc.id,
+        ...doc.data()
+      };
+
+      if(!isHomeworkQuestion(q)){
+        return;
+      }
+
+      const examId =
+        safe(q.examId);
+
+      if(!examId){
+        return;
+      }
+
+      if(
+        !homeworkQuestionIdsByExam.has(
+          examId
+        )
+      ){
+        homeworkQuestionIdsByExam.set(
+          examId,
+          new Set()
+        );
+      }
+
+      homeworkQuestionIdsByExam
+        .get(examId)
+        .add(doc.id);
+    });
+
     const resultKeySet = new Set(
       resultRows.map(row=>
         `${safe(row.examId)}__${safe(row.courseId)}`
       )
     );
 
+    const homeworkExamIds =
+      new Set();
+
     const homeworkRows = [];
 
     state.examMap.forEach(exam=>{
-      if(!isHomeworkExam(exam)) return;
+      const examId =
+        safe(exam.id);
+
+      const homeworkQuestionIds =
+        homeworkQuestionIdsByExam.get(
+          examId
+        ) || new Set();
 
       state.courseIds.forEach(courseId=>{
-        if(visibleQuestionIds(exam,courseId).length === 0){
+        const shownIds =
+          visibleQuestionIds(
+            exam,
+            courseId
+          );
+
+        if(!shownIds.length){
           return;
         }
 
+        /*
+          Homework is considered active if EITHER:
+          1) exam itself is explicitly Homework, OR
+          2) at least one SHOWN question for this exact course
+             has skill/group = Homework.
+
+          This guarantees Hidden homework questions do not create
+          notifications.
+        */
+        const shownHomeworkIds =
+          shownIds.filter(id=>
+            homeworkQuestionIds.has(
+              safe(id)
+            )
+          );
+
+        const homeworkForThisCourse =
+          isHomeworkExam(exam) ||
+          shownHomeworkIds.length > 0;
+
+        if(!homeworkForThisCourse){
+          return;
+        }
+
+        homeworkExamIds.add(examId);
+
         const done =
           resultKeySet.has(
-            `${safe(exam.id)}__${safe(courseId)}`
+            `${examId}__${safe(courseId)}`
           );
 
         homeworkRows.push({
           ...exam,
           courseId,
-          done
+          done,
+          homeworkQuestionCount:
+            shownHomeworkIds.length ||
+            shownIds.length
         });
       });
     });
 
     state.openHomework =
-      homeworkRows.filter(item=>!item.done);
+      homeworkRows.filter(
+        item=>!item.done
+      );
 
     state.homeworkResults =
-      resultRows.filter(row=>{
-        const exam = state.examMap.get(safe(row.examId));
-        return exam && isHomeworkExam(exam);
-      });
+      resultRows.filter(row=>
+        homeworkExamIds.has(
+          safe(row.examId)
+        )
+      );
   }
 
   async function loadActivityHistory(){
@@ -1842,6 +1971,7 @@
           </div>
           <div class="prudle-item-meta">
             ${item.duration ? `<span><i class="fa-regular fa-clock"></i> ${Math.round(Number(item.duration)/60)} دقيقة</span>` : ""}
+            ${item.homeworkQuestionCount ? `<span><i class="fa-solid fa-list-check"></i> ${Number(item.homeworkQuestionCount)} سؤال واجب ظاهر</span>` : ""}
           </div>
           <div class="prudle-item-action">
             <a href="${notificationLink("homework",item)}">
