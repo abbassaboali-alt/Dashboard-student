@@ -1158,6 +1158,58 @@
     }
   </style>
 
+<style>
+    /* =========================
+       SAFARI / iPHONE FIXES
+    ========================== */
+    html{
+      -webkit-text-size-adjust:100%;
+    }
+
+    button{
+      -webkit-appearance:none;
+      appearance:none;
+    }
+
+    .hero-actions{
+      visibility:visible !important;
+      opacity:1 !important;
+    }
+
+    #prudleTopNotificationBtn{
+      display:inline-flex !important;
+      visibility:visible !important;
+      opacity:1 !important;
+      pointer-events:auto !important;
+      -webkit-transform:translateZ(0);
+      transform:translateZ(0);
+    }
+
+    .prudle-center-panel{
+      height:100vh;
+      min-height:100vh;
+      overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+      padding-bottom:calc(18px + env(safe-area-inset-bottom));
+    }
+
+    @supports (height:100dvh){
+      .prudle-center-panel{
+        height:100dvh;
+        min-height:100dvh;
+      }
+    }
+
+    @supports (-webkit-touch-callout:none){
+      .prudle-center-panel{
+        width:100%;
+        max-width:510px;
+      }
+      .prudle-center-head{
+        top:env(safe-area-inset-top);
+      }
+    }
+</style>
 </head>
 <body>
 
@@ -1191,7 +1243,7 @@
                     type="button"
                     aria-label="الإشعارات"
                     onclick="openPrudleStudentCenter('notifications')">
-              <i class="fa-solid fa-bell"></i>
+              <span aria-hidden="true" style="font-size:18px">🔔</span>
               <span>الإشعارات</span>
               <span id="prudleTopNotificationCount" class="hero-notification-count hidden">0</span>
             </button>
@@ -1605,6 +1657,26 @@
     .replace(/"/g,"&quot;")
     .replace(/'/g,"&#039;");
 
+  function byId(id){
+    return document.getElementById(id);
+  }
+
+  function addClass(id,className){
+    const el = byId(id);
+    if(el) el.classList.add(className);
+  }
+
+  function removeClass(id,className){
+    const el = byId(id);
+    if(el) el.classList.remove(className);
+  }
+
+  function toggleClass(id,className,force){
+    const el = byId(id);
+    if(el) el.classList.toggle(className,force);
+  }
+
+
   function getStudentKey(){
     const params = new URLSearchParams(location.search);
     return safe(
@@ -1783,9 +1855,7 @@
       document.getElementById("prudleStudentSmartTools");
     if(smartTools) smartTools.style.display = "grid";
 
-    document
-      .getElementById("prudleStudentNotificationFab")
-      ?.classList.add("show");
+    addClass("prudleStudentNotificationFab","show");
 
     const centerName =
       document.getElementById("prudleStudentCenterName");
@@ -2692,51 +2762,45 @@ window.onload=function(){setTimeout(function(){window.print();},300);};
   }
 
   window.openPrudleStudentCenter = function(tab="notifications"){
+    /* Safari/iPhone: never redirect merely because state has not finished loading yet. */
     if(!state.studentKey){
-      location.href =
-        "https://www.prudle-education.com/log-in-out";
-      return;
+      state.studentKey = getStudentKey();
     }
 
-    document
-      .getElementById("prudleStudentCenterPanel")
-      ?.classList.add("open");
+    if(!state.studentKey){
+      const feed = document.getElementById("prudleNotificationFeed");
+      if(feed){
+        feed.innerHTML = `
+          <div class="prudle-empty-smart">
+            تعذر تحميل بيانات الطالب مؤقتًا. أعد فتح الصفحة من رابط دخول الطالب.
+          </div>
+        `;
+      }
+    }
 
-    document
-      .getElementById("prudleStudentCenterBackdrop")
-      ?.classList.add("open");
+addClass("prudleStudentCenterPanel","open");
+
+    addClass("prudleStudentCenterBackdrop","open");
 
     switchPrudleStudentTab(tab);
   };
 
   window.closePrudleStudentCenter = function(){
-    document
-      .getElementById("prudleStudentCenterPanel")
-      ?.classList.remove("open");
+    removeClass("prudleStudentCenterPanel","open");
 
-    document
-      .getElementById("prudleStudentCenterBackdrop")
-      ?.classList.remove("open");
+    removeClass("prudleStudentCenterBackdrop","open");
   };
 
   window.switchPrudleStudentTab = function(tab){
     const notifications = tab !== "history";
 
-    document
-      .getElementById("prudleNotificationsTabBtn")
-      ?.classList.toggle("active",notifications);
+    toggleClass("prudleNotificationsTabBtn","active",notifications);
 
-    document
-      .getElementById("prudleHistoryTabBtn")
-      ?.classList.toggle("active",!notifications);
+    toggleClass("prudleHistoryTabBtn","active",!notifications);
 
-    document
-      .getElementById("prudleNotificationsTab")
-      ?.classList.toggle("active",notifications);
+    toggleClass("prudleNotificationsTab","active",notifications);
 
-    document
-      .getElementById("prudleHistoryTab")
-      ?.classList.toggle("active",!notifications);
+    toggleClass("prudleHistoryTab","active",!notifications);
   };
 
 
@@ -2786,7 +2850,33 @@ window.onload=function(){setTimeout(function(){window.print();},300);};
     }
   }
 
-  window.addEventListener("load",boot);
+  let prudleBootStarted = false;
+
+  function startPrudleBoot(){
+    if(prudleBootStarted) return;
+    prudleBootStarted = true;
+    boot();
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded",startPrudleBoot,{once:true});
+  }else{
+    setTimeout(startPrudleBoot,0);
+  }
+
+  window.addEventListener("load",startPrudleBoot,{once:true});
+
+  window.addEventListener("pageshow",function(event){
+    /* Safari restores pages from BFCache; refresh data/UI after restore. */
+    if(event && event.persisted){
+      state.studentKey = getStudentKey();
+      refreshNonRealtimeData()
+        .then(renderAll)
+        .catch(function(error){
+          console.warn("Safari pageshow refresh:",error);
+        });
+    }
+  });
 })();
 </script>
 
