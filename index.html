@@ -1696,54 +1696,157 @@
 <script>
 (function(){
 
-  const params = new URLSearchParams(window.location.search);
-
-  const sidFromUrl =
-    params.get("studentID") ||
-    params.get("student_iqama") ||
-    "";
-
-  let sidFromStorage = "";
-  try{
-    sidFromStorage =
-      localStorage.getItem("studentID") ||
-      localStorage.getItem("student_iqama") ||
-      sessionStorage.getItem("studentID") ||
-      sessionStorage.getItem("student_iqama") ||
-      "";
-  }catch(error){
-    console.warn("Student storage read:",error);
-  }
-
-  const studentID = String(sidFromUrl || sidFromStorage).trim();
-
-  /* Keep an in-memory copy so notification clicks never depend only on storage. */
-  window.__prudleStudentID = studentID;
-
-  if(studentID){
+  function prudleStorageGet(storage,key){
     try{
-      localStorage.removeItem("studentLoggedOut");
-      localStorage.setItem("studentID", studentID);
-      localStorage.setItem("student_iqama", studentID);
-      localStorage.setItem("studentLoginDate", new Date().toDateString());
-      sessionStorage.setItem("studentID", studentID);
-      sessionStorage.setItem("student_iqama", studentID);
+      return storage.getItem(key) || "";
     }catch(error){
-      console.warn("Student storage save:",error);
+      return "";
     }
   }
 
-  window.goHomework = function(){
-    const id = String(
-      localStorage.getItem("studentID") ||
-      localStorage.getItem("student_iqama") ||
-      studentID ||
+  function prudleReadStudentCookie(){
+    try{
+      var match =
+        document.cookie.match(/(?:^|;\s*)prudleStudentID=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : "";
+    }catch(error){
+      return "";
+    }
+  }
+
+  function prudleResolveStudentID(){
+    var params;
+    try{
+      params = new URLSearchParams(window.location.search);
+    }catch(error){
+      params = {get:function(){ return ""; }};
+    }
+
+    var fromUrl =
+      params.get("studentID") ||
+      params.get("student_iqama") ||
+      params.get("iqama") ||
+      "";
+
+    var fromStudentStorage =
+      prudleStorageGet(localStorage,"studentID") ||
+      prudleStorageGet(localStorage,"student_iqama") ||
+      prudleStorageGet(sessionStorage,"studentID") ||
+      prudleStorageGet(sessionStorage,"student_iqama") ||
+      "";
+
+    /*
+      IMPORTANT:
+      On some Prudle login flows the first portal page contains the student's
+      number only in "username". Previously the studentID became available
+      only after opening Activities/Homework, which is why notifications
+      appeared only after visiting those pages.
+    */
+    var username =
+      prudleStorageGet(localStorage,"username") ||
+      prudleStorageGet(sessionStorage,"username") ||
+      "";
+
+    var role = String(
+      prudleStorageGet(localStorage,"role") ||
+      prudleStorageGet(sessionStorage,"role") ||
+      ""
+    ).toLowerCase();
+
+    var usernameIsStudent =
+      /^\d{4,}$/.test(String(username).trim()) ||
+      role.indexOf("student") !== -1 ||
+      role.indexOf("طالب") !== -1;
+
+    var fromUsername =
+      usernameIsStudent ? username : "";
+
+    return String(
+      fromUrl ||
+      fromStudentStorage ||
+      window.__prudleStudentID ||
+      fromUsername ||
+      prudleReadStudentCookie() ||
       ""
     ).trim();
+  }
 
-    // لا نسجل خروج الطالب إذا لم نجد الرقم في هذه الصفحة.
-    // نفتح صفحة الواجبات مباشرة، وإذا كان الرقم متاحًا نمرره معها.
-    const baseUrl = "https://www.prudle-education.com/homework-students";
+  var studentID = prudleResolveStudentID();
+
+  window.__prudleStudentID = studentID;
+  window.__prudleResolveStudentID = prudleResolveStudentID;
+
+  function prudlePersistStudentID(id){
+    id = String(id || "").trim();
+    if(!id) return;
+
+    window.__prudleStudentID = id;
+
+    try{
+      localStorage.removeItem("studentLoggedOut");
+      localStorage.setItem("studentID",id);
+      localStorage.setItem("student_iqama",id);
+      localStorage.setItem("studentLoginDate",new Date().toDateString());
+    }catch(error){}
+
+    try{
+      sessionStorage.removeItem("studentLoggedOut");
+      sessionStorage.setItem("studentID",id);
+      sessionStorage.setItem("student_iqama",id);
+      sessionStorage.setItem("studentLoginDate",new Date().toDateString());
+    }catch(error){}
+
+    try{
+      document.cookie =
+        "prudleStudentID=" + encodeURIComponent(id) +
+        "; path=/; max-age=2592000; SameSite=Lax; Secure";
+    }catch(error){}
+  }
+
+  if(studentID){
+    prudlePersistStudentID(studentID);
+  }
+
+  /*
+    Re-check identity shortly after page startup.
+    This catches login scripts that write localStorage a little later.
+  */
+  var identityChecks = 0;
+  var identityTimer = setInterval(function(){
+    identityChecks++;
+
+    var current = prudleResolveStudentID();
+
+    if(current){
+      prudlePersistStudentID(current);
+      clearInterval(identityTimer);
+
+      try{
+        window.dispatchEvent(
+          new CustomEvent("prudleStudentIdentityReady",{
+            detail:{studentID:current}
+          })
+        );
+      }catch(error){
+        var event = document.createEvent("Event");
+        event.initEvent("prudleStudentIdentityReady",true,true);
+        window.dispatchEvent(event);
+      }
+
+      return;
+    }
+
+    if(identityChecks >= 20){
+      clearInterval(identityTimer);
+    }
+  },250);
+
+  window.goHomework = function(){
+    var id = prudleResolveStudentID();
+
+    var baseUrl =
+      "https://www.prudle-education.com/homework-students";
+
     location.href = id
       ? baseUrl + "?studentID=" + encodeURIComponent(id)
       : baseUrl;
@@ -1798,27 +1901,38 @@
     .replace(/'/g,"&#039;");
 
   function getStudentKey(){
-    const params = new URLSearchParams(location.search);
+    var key = "";
 
-    let stored = "";
     try{
-      stored =
-        localStorage.getItem("studentID") ||
-        localStorage.getItem("student_iqama") ||
-        sessionStorage.getItem("studentID") ||
-        sessionStorage.getItem("student_iqama") ||
-        "";
-    }catch(error){
-      console.warn("Student storage access:",error);
+      if(window.__prudleResolveStudentID){
+        key = safe(window.__prudleResolveStudentID());
+      }
+    }catch(error){}
+
+    if(!key){
+      try{
+        var params = new URLSearchParams(location.search);
+        key = safe(
+          params.get("studentID") ||
+          params.get("student_iqama") ||
+          params.get("iqama") ||
+          ""
+        );
+      }catch(error){}
     }
 
-    const key = safe(
-      params.get("studentID") ||
-      params.get("student_iqama") ||
-      window.__prudleStudentID ||
-      stored ||
-      ""
-    );
+    if(!key){
+      try{
+        key = safe(
+          localStorage.getItem("studentID") ||
+          localStorage.getItem("student_iqama") ||
+          sessionStorage.getItem("studentID") ||
+          sessionStorage.getItem("student_iqama") ||
+          window.__prudleStudentID ||
+          ""
+        );
+      }catch(error){}
+    }
 
     if(key){
       window.__prudleStudentID = key;
@@ -3419,42 +3533,76 @@ td.score{font-weight:900;direction:ltr}
   };
 
   async function boot(){
-    try{
-      const ok = await loadStudentContext();
+    var attempts = 0;
+    var maxAttempts = 20;
 
-      if(!ok){
-        const msg = `
-          <div class="prudle-empty-smart">
-            تعذر تحميل بيانات الطالب في هذه الصفحة.
-          </div>
-        `;
-        const nf = document.getElementById("prudleNotificationFeed");
-        const hf = document.getElementById("prudleHistoryFeed");
-        if(nf) nf.innerHTML = msg;
-        if(hf) hf.innerHTML = msg;
-        return;
+    async function tryStart(){
+      attempts++;
+
+      try{
+        state.studentKey = getStudentKey();
+
+        if(!state.studentKey){
+          if(attempts < maxAttempts){
+            setTimeout(tryStart,250);
+          }
+          return;
+        }
+
+        var ok = await loadStudentContext();
+
+        if(!ok){
+          if(attempts < maxAttempts){
+            setTimeout(tryStart,350);
+          }else{
+            var noStudent =
+              '<div class="prudle-empty-smart">' +
+              'تعذر تحميل بيانات الطالب. حدّث الصفحة أو سجّل الدخول مرة أخرى.' +
+              '</div>';
+
+            var nf0 =
+              document.getElementById("prudleNotificationFeed");
+            var hf0 =
+              document.getElementById("prudleHistoryFeed");
+
+            if(nf0) nf0.innerHTML = noStudent;
+            if(hf0) hf0.innerHTML = noStudent;
+          }
+          return;
+        }
+
+        /*
+          Load notifications/results immediately on portal entry.
+          No click on Activities, Homework or Notifications is required.
+        */
+        await refreshNonRealtimeData();
+        renderAll();
+
+        listenIndividualSessions();
+
+        if(state.refreshTimer){
+          clearInterval(state.refreshTimer);
+        }
+
+        state.refreshTimer = setInterval(
+          refreshNonRealtimeData,
+          30000
+        );
+
+      }catch(error){
+        console.warn(
+          "Immediate Prudle notification startup attempt " +
+          attempts + ":",
+          error
+        );
+
+        if(attempts < maxAttempts){
+          setTimeout(tryStart,500);
+        }
       }
-
-      await refreshNonRealtimeData();
-      listenIndividualSessions();
-
-      state.refreshTimer = setInterval(
-        refreshNonRealtimeData,
-        60000
-      );
-    }catch(error){
-      console.error("Unable to start student notifications:",error);
-
-      const msg = `
-        <div class="prudle-empty-smart">
-          تعذر تحميل البيانات مؤقتًا. حدّث الصفحة وحاول مرة أخرى.
-        </div>
-      `;
-      const nf = document.getElementById("prudleNotificationFeed");
-      const hf = document.getElementById("prudleHistoryFeed");
-      if(nf) nf.innerHTML = msg;
-      if(hf) hf.innerHTML = msg;
     }
+
+    tryStart();
   }
 
   let prudleBootStarted = false;
@@ -3473,22 +3621,62 @@ td.score{font-weight:900;direction:ltr}
 
   window.addEventListener("load",startPrudleBoot,{once:true});
 
-  /* Safari/Chrome mobile can restore the page from back-forward cache. */
-  window.addEventListener("pageshow",function(event){
-    if(event && event.persisted){
-      state.studentKey = getStudentKey();
-      if(state.studentKey){
-        loadStudentContext()
-          .then(function(ok){
-            if(!ok) return;
-            return refreshNonRealtimeData();
-          })
-          .then(function(){ renderAll(); })
-          .catch(function(error){
-            console.warn("BFCache student refresh:",error);
-          });
-      }
-    }
+  window.addEventListener("prudleStudentIdentityReady",function(){
+    state.studentKey = getStudentKey();
+
+    if(!state.studentKey) return;
+
+    loadStudentContext()
+      .then(function(ok){
+        if(!ok) return;
+        return refreshNonRealtimeData();
+      })
+      .then(function(){
+        renderAll();
+        listenIndividualSessions();
+      })
+      .catch(function(error){
+        console.warn("Identity-ready notification refresh:",error);
+      });
+  });
+
+
+  /*
+    Any browser may restore the portal from memory.
+    Always refresh notifications immediately when the page becomes active.
+  */
+  window.addEventListener("pageshow",function(){
+    state.studentKey = getStudentKey();
+
+    if(!state.studentKey) return;
+
+    loadStudentContext()
+      .then(function(ok){
+        if(!ok) return;
+        return refreshNonRealtimeData();
+      })
+      .then(function(){
+        renderAll();
+        listenIndividualSessions();
+      })
+      .catch(function(error){
+        console.warn("pageshow notification refresh:",error);
+      });
+  });
+
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState !== "visible") return;
+
+    state.studentKey = getStudentKey();
+    if(!state.studentKey) return;
+
+    refreshNonRealtimeData()
+      .then(function(){
+        renderAll();
+      })
+      .catch(function(error){
+        console.warn("visibility notification refresh:",error);
+      });
   });
 })();
 </script>
