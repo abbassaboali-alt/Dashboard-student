@@ -1147,8 +1147,7 @@
 </style>
 
 
-<style id="prudle-all-browser-compatibility">
-  /* Universal mobile viewport fallback */
+<style id="prudle-universal-notification-browser-fix">
   #prudleStudentCenterPanel{
     height:100vh !important;
     min-height:100vh !important;
@@ -1163,22 +1162,18 @@
     }
   }
 
-  @supports not (backdrop-filter: blur(1px)){
-    .portal-wrap{
-      background:#ffffff;
-    }
-  }
-
-  button,
-  a{
-    -webkit-tap-highlight-color:transparent;
-  }
-
   @media(max-width:760px){
     #prudleStudentCenterPanel{
       width:100% !important;
       max-width:100% !important;
       left:0 !important;
+    }
+
+    #prudleTopNotificationBtn{
+      display:inline-flex !important;
+      visibility:visible !important;
+      opacity:1 !important;
+      pointer-events:auto !important;
     }
   }
 </style>
@@ -1601,28 +1596,21 @@
     firebase.initializeApp(FIREBASE_CONFIG);
   }
 
-  /*
-    Browser compatibility:
-    - Chrome / Edge / Firefox / Android: keep the normal Firestore SDK.
-    - Safari / iPhone: SDK reads are allowed, but every important read has
-      a Firestore REST fallback. This bypasses Safari/WebChannel problems.
-  */
-  var isSafariBrowser = (function(){
-    var ua = navigator.userAgent || "";
-    return /Safari/i.test(ua) &&
-           !/Chrome|CriOS|Chromium|Edg|OPR|FxiOS/i.test(ua);
-  })();
 
   const db = firebase.firestore();
 
-  const FIRESTORE_REST_BASE =
+  /*
+    UNIVERSAL FIRESTORE READER
+    All browsers use REST reads first, then Firebase SDK as fallback.
+    This makes Safari, Chrome, Edge, Firefox and Android use the same data path.
+  */
+  const PRUDLE_FIRESTORE_REST =
     "https://firestore.googleapis.com/v1/projects/" +
     FIREBASE_CONFIG.projectId +
     "/databases/(default)/documents";
 
-  function restDecodeValue(value){
+  function prudleDecodeFirestoreValue(value){
     if(!value || typeof value !== "object") return null;
-
     if(Object.prototype.hasOwnProperty.call(value,"nullValue")) return null;
     if(Object.prototype.hasOwnProperty.call(value,"stringValue")) return value.stringValue;
     if(Object.prototype.hasOwnProperty.call(value,"booleanValue")) return !!value.booleanValue;
@@ -1630,138 +1618,69 @@
     if(Object.prototype.hasOwnProperty.call(value,"doubleValue")) return Number(value.doubleValue);
     if(Object.prototype.hasOwnProperty.call(value,"timestampValue")) return value.timestampValue;
     if(Object.prototype.hasOwnProperty.call(value,"referenceValue")) return value.referenceValue;
-    if(Object.prototype.hasOwnProperty.call(value,"bytesValue")) return value.bytesValue;
-
-    if(value.geoPointValue){
-      return {
-        latitude:Number(value.geoPointValue.latitude || 0),
-        longitude:Number(value.geoPointValue.longitude || 0)
-      };
-    }
-
     if(value.arrayValue){
-      var values = value.arrayValue.values || [];
-      return values.map(restDecodeValue);
+      return (value.arrayValue.values || []).map(prudleDecodeFirestoreValue);
     }
-
     if(value.mapValue){
-      return restDecodeFields(value.mapValue.fields || {});
+      return prudleDecodeFirestoreFields(value.mapValue.fields || {});
     }
-
     return null;
   }
 
-  function restDecodeFields(fields){
-    var obj = {};
+  function prudleDecodeFirestoreFields(fields){
+    var result = {};
     fields = fields || {};
     Object.keys(fields).forEach(function(key){
-      obj[key] = restDecodeValue(fields[key]);
+      result[key] = prudleDecodeFirestoreValue(fields[key]);
     });
-    return obj;
+    return result;
   }
 
-  function restDocObject(raw){
+  function prudleRestDoc(raw){
     if(!raw || !raw.name) return null;
     var parts = raw.name.split("/");
     return {
       id:parts[parts.length - 1],
-      data:restDecodeFields(raw.fields || {}),
-      raw:raw
+      data:prudleDecodeFirestoreFields(raw.fields || {})
     };
   }
 
-  async function restFetchJson(url,options){
-    var response = await fetch(url,options || {});
-    if(!response.ok){
-      var body = "";
-      try{ body = await response.text(); }catch(error){}
-      throw new Error("Firestore REST " + response.status + " " + body);
-    }
-    return response.json();
-  }
-
-  async function restGetCollection(collectionName){
+  async function prudleRestCollection(collectionName){
     var rows = [];
-    var pageToken = "";
-
+    var token = "";
     do{
       var url =
-        FIRESTORE_REST_BASE + "/" + encodeURIComponent(collectionName) +
+        PRUDLE_FIRESTORE_REST + "/" +
+        encodeURIComponent(collectionName) +
         "?pageSize=1000&key=" + encodeURIComponent(FIREBASE_CONFIG.apiKey);
 
-      if(pageToken){
-        url += "&pageToken=" + encodeURIComponent(pageToken);
+      if(token){
+        url += "&pageToken=" + encodeURIComponent(token);
       }
 
-      var json = await restFetchJson(url,{
+      var response = await fetch(url,{
         method:"GET",
-        cache:"no-store"
+        cache:"no-store",
+        credentials:"omit"
       });
 
+      if(!response.ok){
+        throw new Error("REST " + collectionName + " HTTP " + response.status);
+      }
+
+      var json = await response.json();
       (json.documents || []).forEach(function(raw){
-        var doc = restDocObject(raw);
+        var doc = prudleRestDoc(raw);
         if(doc) rows.push(doc);
       });
 
-      pageToken = json.nextPageToken || "";
-    }while(pageToken);
+      token = json.nextPageToken || "";
+    }while(token);
 
     return rows;
   }
 
-  async function restGetDocument(collectionName,docId){
-    var url =
-      FIRESTORE_REST_BASE + "/" +
-      encodeURIComponent(collectionName) + "/" +
-      encodeURIComponent(docId) +
-      "?key=" + encodeURIComponent(FIREBASE_CONFIG.apiKey);
-
-    var json = await restFetchJson(url,{
-      method:"GET",
-      cache:"no-store"
-    });
-
-    return restDocObject(json);
-  }
-
-  async function restRunEqual(collectionName,fieldName,value){
-    var url =
-      "https://firestore.googleapis.com/v1/projects/" +
-      FIREBASE_CONFIG.projectId +
-      "/databases/(default)/documents:runQuery?key=" +
-      encodeURIComponent(FIREBASE_CONFIG.apiKey);
-
-    var body = {
-      structuredQuery:{
-        from:[{collectionId:collectionName}],
-        where:{
-          fieldFilter:{
-            field:{fieldPath:fieldName},
-            op:"EQUAL",
-            value:{stringValue:String(value)}
-          }
-        }
-      }
-    };
-
-    var json = await restFetchJson(url,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(body),
-      cache:"no-store"
-    });
-
-    var rows = [];
-    (json || []).forEach(function(item){
-      if(item && item.document){
-        var doc = restDocObject(item.document);
-        if(doc) rows.push(doc);
-      }
-    });
-    return rows;
-  }
-
-  function compatSnapshotFromRows(rows){
+  function prudleSnapshot(rows){
     return {
       docs:(rows || []).map(function(row){
         return {
@@ -1773,82 +1692,34 @@
     };
   }
 
-  async function compatCollectionGet(collectionName){
-    /*
-      Safari goes through REST first because this is the part that was
-      returning empty/no reports for the user. Other browsers keep SDK first.
-    */
-    if(isSafariBrowser){
-      try{
-        return compatSnapshotFromRows(
-          await restGetCollection(collectionName)
-        );
-      }catch(restError){
-        console.warn("Safari REST collection fallback:",collectionName,restError);
-        return db.collection(collectionName).get();
-      }
-    }
-
+  async function prudleGetCollection(collectionName){
     try{
-      return await db.collection(collectionName).get();
-    }catch(sdkError){
-      console.warn("SDK collection fallback to REST:",collectionName,sdkError);
-      return compatSnapshotFromRows(
-        await restGetCollection(collectionName)
-      );
+      return prudleSnapshot(await prudleRestCollection(collectionName));
+    }catch(restError){
+      console.warn("REST -> SDK fallback:",collectionName,restError);
+      return db.collection(collectionName).get();
     }
   }
 
-  async function compatDocumentGet(collectionName,docId){
-    if(isSafariBrowser){
-      try{
-        var row = await restGetDocument(collectionName,docId);
-        return {
-          id:row.id,
-          exists:true,
-          data:function(){ return row.data; }
-        };
-      }catch(restError){
-        console.warn("Safari REST document fallback:",collectionName,docId,restError);
-        return db.collection(collectionName).doc(docId).get();
+  async function prudleGetDocument(collectionName,docId){
+    var snap = await prudleGetCollection(collectionName);
+    var found = null;
+
+    snap.docs.some(function(doc){
+      if(String(doc.id) === String(docId)){
+        found = doc;
+        return true;
       }
-    }
+      return false;
+    });
 
-    try{
-      return await db.collection(collectionName).doc(docId).get();
-    }catch(sdkError){
-      var row2 = await restGetDocument(collectionName,docId);
-      return {
-        id:row2.id,
-        exists:true,
-        data:function(){ return row2.data; }
-      };
-    }
-  }
+    if(found) return found;
 
-  async function compatEqualQuery(collectionName,fieldName,value){
-    if(isSafariBrowser){
-      try{
-        return compatSnapshotFromRows(
-          await restRunEqual(collectionName,fieldName,value)
-        );
-      }catch(restError){
-        console.warn("Safari REST query fallback:",collectionName,restError);
-        return db.collection(collectionName)
-          .where(fieldName,"==",value)
-          .get();
-      }
-    }
-
-    try{
-      return await db.collection(collectionName)
-        .where(fieldName,"==",value)
-        .get();
-    }catch(sdkError){
-      return compatSnapshotFromRows(
-        await restRunEqual(collectionName,fieldName,value)
-      );
-    }
+    return {
+      id:String(docId || ""),
+      exists:false,
+      data:function(){ return {}; }
+    };
   }
 
   const state = {
@@ -1883,7 +1754,7 @@
     try{
       params = new URLSearchParams(location.search);
     }catch(error){
-      params = { get:function(){ return ""; } };
+      params = {get:function(){ return ""; }};
     }
 
     var stored = "";
@@ -1894,14 +1765,12 @@
         sessionStorage.getItem("studentID") ||
         sessionStorage.getItem("student_iqama") ||
         "";
-    }catch(error){
-      console.warn("Student storage access:",error);
-    }
+    }catch(error){}
 
-    var cookieID = "";
+    var cookieValue = "";
     try{
-      var match = document.cookie.match(/(?:^|;\s*)prudleStudentID=([^;]+)/);
-      cookieID = match ? decodeURIComponent(match[1]) : "";
+      var match = document.cookie.match(/(?:^|;\\s*)prudleStudentID=([^;]+)/);
+      cookieValue = match ? decodeURIComponent(match[1]) : "";
     }catch(error){}
 
     var key = safe(
@@ -1909,23 +1778,20 @@
       params.get("student_iqama") ||
       window.__prudleStudentID ||
       stored ||
-      cookieID ||
+      cookieValue ||
       ""
     );
 
     if(key){
       window.__prudleStudentID = key;
-
       try{
         localStorage.setItem("studentID",key);
         localStorage.setItem("student_iqama",key);
       }catch(error){}
-
       try{
         sessionStorage.setItem("studentID",key);
         sessionStorage.setItem("student_iqama",key);
       }catch(error){}
-
       try{
         document.cookie =
           "prudleStudentID=" + encodeURIComponent(key) +
@@ -1956,9 +1822,9 @@
     }
 
     const category = safe(
-      (exam && exam.examCategory) ||
-      (exam && exam.examType) ||
-      (exam && exam.category)
+      exam && exam.examCategory ||
+      exam && exam.examType ||
+      exam && exam.category
     ).toLowerCase();
 
     return category === "homework";
@@ -1966,18 +1832,18 @@
 
   function isQuizExam(exam){
     const category = safe(
-      (exam && exam.examCategory) ||
-      (exam && exam.examType) ||
-      (exam && exam.category) ||
-      (exam && exam.type) ||
+      exam && exam.examCategory ||
+      exam && exam.examType ||
+      exam && exam.category ||
+      exam && exam.type ||
       ""
     ).toLowerCase();
 
-    const skill = safe((exam && exam.examSkill) || "").toLowerCase();
+    const skill = safe(exam && exam.examSkill || "").toLowerCase();
     const title = safe(
-      (exam && exam.title) ||
-      (exam && exam.examTitle) ||
-      (exam && exam.name) ||
+      exam && exam.title ||
+      exam && exam.examTitle ||
+      exam && exam.name ||
       ""
     ).toLowerCase();
 
@@ -1999,14 +1865,14 @@
   */
   function isHomeworkQuestion(question){
     const skill = safe(
-      (question && question.skill) ||
-      (question && question.examSkill) ||
+      question && question.skill ||
+      question && question.examSkill ||
       ""
     ).toLowerCase();
 
     const group = safe(
-      (question && question.group) ||
-      (question && question.category) ||
+      question && question.group ||
+      question && question.category ||
       ""
     ).toLowerCase();
 
@@ -2019,7 +1885,7 @@
 
   function visibleQuestionIds(exam,courseId){
     const map =
-      (exam && exam.visibleQuestionsByCourse) &&
+      exam && exam.visibleQuestionsByCourse &&
       typeof exam.visibleQuestionsByCourse === "object"
         ? exam.visibleQuestionsByCourse
         : {};
@@ -2053,62 +1919,60 @@
 
   async function loadStudentContext(){
     state.studentKey = getStudentKey();
+    if(!state.studentKey) return false;
 
-    if(!state.studentKey){
-      return false;
-    }
+    var studentSnap = await prudleGetCollection("students");
 
-    const studentSnap = await compatEqualQuery(
-      "students",
-      "iqama",
-      state.studentKey
-    );
+    state.studentDocs = studentSnap.docs
+      .map(function(doc){
+        return Object.assign({id:doc.id},doc.data());
+      })
+      .filter(function(item){
+        var ids = [
+          item.iqama,
+          item.studentIqama,
+          item.studentID,
+          item.studentId,
+          item.ID,
+          item.idNumber
+        ].map(safe);
+        return ids.indexOf(state.studentKey) !== -1;
+      });
 
-    state.studentDocs = studentSnap.docs.map(doc=>({
-      id:doc.id,
-      ...doc.data()
-    }));
-
-    if(!state.studentDocs.length){
-      return false;
-    }
+    if(!state.studentDocs.length) return false;
 
     state.studentName =
-      safe(state.studentDocs[0] && state.studentDocs[0].name) ||
-      "Student";
+      safe(state.studentDocs[0] && state.studentDocs[0].name) || "Student";
 
     state.courseIds = new Set(
       state.studentDocs
-        .map(item=>safe(item.courseId))
+        .map(function(item){ return safe(item.courseId); })
         .filter(Boolean)
     );
 
-    const courseDocs = await Promise.all(
-      [...state.courseIds].map(courseId=>
-        compatDocumentGet("Courses",courseId)
-      )
+    var courseDocs = await Promise.all(
+      Array.from(state.courseIds).map(function(courseId){
+        return prudleGetDocument("Courses",courseId);
+      })
     );
 
     state.openCourses = new Map(
       courseDocs
-        .filter(doc=>doc.exists)
-        .map(doc=>[doc.id,{id:doc.id,...doc.data()}])
-        .filter(([,course])=>
-          safe(course.status).toLowerCase() === "open"
-        )
+        .filter(function(doc){ return doc && doc.exists; })
+        .map(function(doc){
+          return [doc.id,Object.assign({id:doc.id},doc.data())];
+        })
+        .filter(function(pair){
+          return safe(pair[1].status).toLowerCase() === "open";
+        })
     );
 
     state.openCourseIds = new Set(state.openCourses.keys());
 
-    const smartTools =
-      document.getElementById("prudleStudentSmartTools");
+    var smartTools = document.getElementById("prudleStudentSmartTools");
     if(smartTools) smartTools.style.display = "grid";
 
-    var oldFab = document.getElementById("prudleStudentNotificationFab");
-    if(oldFab) oldFab.classList.add("show");
-
-    const centerName =
-      document.getElementById("prudleStudentCenterName");
+    var centerName = document.getElementById("prudleStudentCenterName");
     if(centerName){
       centerName.textContent =
         state.studentName + " — الإشعارات والدرجات";
@@ -2118,53 +1982,17 @@
   }
 
   async function readStudentExamResults(){
-    let docs = [];
-
-    try{
-      const snap = await compatEqualQuery(
-        "results",
-        "studentIqama",
-        state.studentKey
-      );
-
-      docs = snap.docs.map(doc=>({
-        id:doc.id,
-        ...doc.data()
-      }));
-    }catch(error){
-      console.warn("Result query fallback:",error);
-      const snap = await compatCollectionGet("results");
-      docs = snap.docs
-        .map(doc=>({id:doc.id,...doc.data()}))
-        .filter(resultMatchesStudent);
-    }
-
-    return docs;
+    var snap = await prudleGetCollection("results");
+    return snap.docs
+      .map(function(doc){ return Object.assign({id:doc.id},doc.data()); })
+      .filter(resultMatchesStudent);
   }
 
   async function readStudentActivityResults(){
-    let docs = [];
-
-    try{
-      const snap = await compatEqualQuery(
-        "FunActivityResults",
-        "participantId",
-        state.studentKey
-      );
-
-      docs = snap.docs.map(doc=>({
-        id:doc.id,
-        ...doc.data()
-      }));
-    }catch(error){
-      console.warn("Activity result query fallback:",error);
-      const snap = await compatCollectionGet("FunActivityResults");
-      docs = snap.docs
-        .map(doc=>({id:doc.id,...doc.data()}))
-        .filter(resultMatchesStudent);
-    }
-
-    return docs;
+    var snap = await prudleGetCollection("FunActivityResults");
+    return snap.docs
+      .map(function(doc){ return Object.assign({id:doc.id},doc.data()); })
+      .filter(resultMatchesStudent);
   }
 
   async function loadHomeworkState(){
@@ -2176,8 +2004,8 @@
     */
     const [examSnap, questionSnap, resultRows] =
       await Promise.all([
-        compatCollectionGet("exams"),
-        compatCollectionGet("questions"),
+        prudleGetCollection("exams"),
+        prudleGetCollection("questions"),
         readStudentExamResults()
       ]);
 
@@ -2333,9 +2161,9 @@
 
   function activityCourseId(item){
     return safe(
-      (item && item.courseId) ||
-      (item && item.participantCourseId) ||
-      (item && item.sourceCourseId)
+      item && item.courseId ||
+      item && item.participantCourseId ||
+      item && item.sourceCourseId
     );
   }
 
@@ -2371,7 +2199,7 @@
 
   function activityRank(item){
     const key = activityIdentity(item);
-    const currentParticipant = safe((item && item.participantId) || state.studentKey);
+    const currentParticipant = safe(item && item.participantId || state.studentKey);
 
     const sameCompetition = state.allActivityResults.filter(row=>
       activityIdentity(row) === key &&
@@ -2450,7 +2278,7 @@
 
     setTimeout(async function(){
       try{
-        const snap = await compatCollectionGet("FunActivityResults");
+        const snap = await prudleGetCollection("FunActivityResults");
         const allRows = snap.docs.map(doc=>({id:doc.id,...doc.data()}));
 
         state.allActivityResults = allRows.filter(row=>{
@@ -2468,7 +2296,7 @@
 
   function listenIndividualSessions(){
     if(state.individualUnsubscribe){
-      state.individualUnsubscribe();
+      try{ state.individualUnsubscribe(); }catch(error){}
       state.individualUnsubscribe = null;
     }
 
@@ -2477,85 +2305,47 @@
       state.individualPollTimer = null;
     }
 
-    function applyIndividualRows(rows){
-      state.openIndividual = (rows || [])
-        .filter(function(item){
-          return (
-            safe(item.mode).toLowerCase() === "individual" &&
-            safe(item.status).toLowerCase() === "active" &&
-            activityVisibleForStudent(item) &&
-            !hasSolvedActivity(item)
-          );
-        })
-        .sort(function(a,b){
-          return (
-            timestampValue(b.createdAt || b.updatedAt) -
-            timestampValue(a.createdAt || a.updatedAt)
-          );
-        });
-
-      renderAll();
-      maybeToastNewItems();
-    }
-
-    async function pollIndividualSessions(){
+    async function loadLiveIndividualNotifications(){
       try{
-        const snap = await compatCollectionGet("FunActivityLiveSessions");
-        const rows = snap.docs.map(function(doc){
-          return Object.assign({id:doc.id},doc.data());
-        });
-        applyIndividualRows(rows);
+        var snapshot = await prudleGetCollection("FunActivityLiveSessions");
+
+        state.openIndividual = snapshot.docs
+          .map(function(doc){
+            return Object.assign({id:doc.id},doc.data());
+          })
+          .filter(function(item){
+            return (
+              safe(item.mode).toLowerCase() === "individual" &&
+              safe(item.status).toLowerCase() === "active" &&
+              activityVisibleForStudent(item) &&
+              !hasSolvedActivity(item)
+            );
+          })
+          .sort(function(a,b){
+            return timestampValue(b.createdAt || b.updatedAt) -
+                   timestampValue(a.createdAt || a.updatedAt);
+          });
+
+        renderAll();
+        maybeToastNewItems();
       }catch(error){
-        console.warn("Individual session polling:",error);
+        console.warn("Live notification refresh:",error);
       }
     }
 
-    if(isSafariBrowser){
-      /*
-        Safari: avoid WebChannel onSnapshot completely.
-        REST polling is reliable and still refreshes notifications quickly.
-      */
-      pollIndividualSessions();
-      state.individualPollTimer = setInterval(
-        pollIndividualSessions,
-        15000
-      );
+    loadLiveIndividualNotifications();
 
-      state.individualUnsubscribe = function(){
-        if(state.individualPollTimer){
-          clearInterval(state.individualPollTimer);
-          state.individualPollTimer = null;
-        }
-      };
-      return;
-    }
+    state.individualPollTimer = setInterval(
+      loadLiveIndividualNotifications,
+      15000
+    );
 
-    try{
-      state.individualUnsubscribe =
-        db.collection("FunActivityLiveSessions")
-          .onSnapshot(function(snapshot){
-            const rows = snapshot.docs.map(function(doc){
-              return Object.assign({id:doc.id},doc.data());
-            });
-            applyIndividualRows(rows);
-          },function(error){
-            console.warn("Individual session realtime:",error);
-            pollIndividualSessions();
-
-            state.individualPollTimer = setInterval(
-              pollIndividualSessions,
-              15000
-            );
-          });
-    }catch(error){
-      console.warn("Individual session listener:",error);
-      pollIndividualSessions();
-
-      state.individualPollTimer = setInterval(
-        pollIndividualSessions,
-        15000
-      );
-    }
+    state.individualUnsubscribe = function(){
+      if(state.individualPollTimer){
+        clearInterval(state.individualPollTimer);
+        state.individualPollTimer = null;
+      }
+    };
   }
 
   function renderNotifications(){
@@ -3190,30 +2980,22 @@ td.score{font-weight:900;direction:ltr}
   }
 
   async function refreshNonRealtimeData(){
-    /*
-      Cross-browser independent loading.
-      A failure in one source must never hide the other source.
-    */
     function settle(promise){
       return Promise.resolve(promise)
-        .then(function(value){
-          return {status:"fulfilled",value:value};
-        })
-        .catch(function(reason){
-          return {status:"rejected",reason:reason};
-        });
+        .then(function(value){ return {ok:true,value:value}; })
+        .catch(function(error){ return {ok:false,error:error}; });
     }
 
-    var tasks = await Promise.all([
+    var results = await Promise.all([
       settle(loadHomeworkState()),
       settle(loadActivityHistory())
     ]);
 
-    tasks.forEach(function(result,index){
-      if(result.status === "rejected"){
+    results.forEach(function(result,index){
+      if(!result.ok){
         console.warn(
-          index === 0 ? "Homework results load:" : "Activity results load:",
-          result.reason
+          index === 0 ? "Homework/Quiz load:" : "Activity load:",
+          result.error
         );
       }
     });
@@ -3222,67 +3004,45 @@ td.score{font-weight:900;direction:ltr}
     maybeToastNewItems();
   }
 
-  window.openPrudleStudentCenter = function(tab="notifications"){
-    /*
-      IMPORTANT:
-      Opening notifications must NEVER log the student out.
-      On mobile/desktop the click can happen before Firebase boot completes.
-    */
+  window.openPrudleStudentCenter = function(tab){
+    tab = tab || "notifications";
+
     if(!state.studentKey){
       state.studentKey = getStudentKey();
     }
 
-    const panel = document.getElementById("prudleStudentCenterPanel");
-    const backdrop = document.getElementById("prudleStudentCenterBackdrop");
+    var panel = document.getElementById("prudleStudentCenterPanel");
+    var backdrop = document.getElementById("prudleStudentCenterBackdrop");
 
     if(panel){
       panel.classList.add("open");
       panel.setAttribute("aria-hidden","false");
     }
-    if(backdrop){
-      backdrop.classList.add("open");
-    }
+    if(backdrop) backdrop.classList.add("open");
 
     switchPrudleStudentTab(tab);
 
-    /* If context was not ready yet, load it now without leaving the page. */
-    if(state.studentKey && !state.studentDocs.length){
-      loadStudentContext()
-        .then(function(ok){
-          if(!ok) return;
-          return refreshNonRealtimeData();
-        })
-        .then(function(){
-          renderAll();
-        })
-        .catch(function(error){
-          console.warn("Notification center lazy load:",error);
-          const feed = document.getElementById(
-            tab === "history" ? "prudleHistoryFeed" : "prudleNotificationFeed"
-          );
-          if(feed){
-            feed.innerHTML = `
-              <div class="prudle-empty-smart">
-                تعذر تحميل البيانات مؤقتًا. اضغط على الإشعارات مرة أخرى بعد لحظات.
-              </div>
-            `;
-          }
-        });
-    }
-
-    /* No student key: show a message, do not redirect or clear login. */
-    if(!state.studentKey){
-      const message = `
-        <div class="prudle-empty-smart">
-          لم يتم العثور على رقم الطالب في هذه الصفحة.<br>
-          ارجع إلى بوابة الطالب ثم افتح الإشعارات مرة أخرى.
-        </div>
-      `;
-      const nf = document.getElementById("prudleNotificationFeed");
-      const hf = document.getElementById("prudleHistoryFeed");
-      if(nf) nf.innerHTML = message;
-      if(hf) hf.innerHTML = message;
-    }
+    loadStudentContext()
+      .then(function(ok){
+        if(!ok) throw new Error("Student not found");
+        return refreshNonRealtimeData();
+      })
+      .then(function(){
+        renderAll();
+        listenIndividualSessions();
+      })
+      .catch(function(error){
+        console.warn("Student center refresh:",error);
+        var feed = document.getElementById(
+          tab === "history" ? "prudleHistoryFeed" : "prudleNotificationFeed"
+        );
+        if(feed){
+          feed.innerHTML =
+            '<div class="prudle-empty-smart">' +
+            'تعذر تحديث البيانات الآن. تأكد من تسجيل دخول الطالب ثم حاول مرة أخرى.' +
+            '</div>';
+        }
+      });
   };
 
   window.closePrudleStudentCenter = function(){
@@ -3312,28 +3072,14 @@ td.score{font-weight:900;direction:ltr}
 
   window.prudleStudentLogout = function(){
     try{
-      if(state.individualUnsubscribe){
-        state.individualUnsubscribe();
-        state.individualUnsubscribe = null;
-      }
-      if(state.refreshTimer){
-        clearInterval(state.refreshTimer);
-        state.refreshTimer = null;
-      }
-      if(state.individualPollTimer){
-        clearInterval(state.individualPollTimer);
-        state.individualPollTimer = null;
-      }
+      if(state.individualUnsubscribe) state.individualUnsubscribe();
+      if(state.individualPollTimer) clearInterval(state.individualPollTimer);
+      if(state.refreshTimer) clearInterval(state.refreshTimer);
     }catch(error){}
 
     var keys = [
-      "studentID",
-      "student_iqama",
-      "studentLoginDate",
-      "studentName",
-      "username",
-      "role",
-      "loginDate"
+      "studentID","student_iqama","studentLoginDate",
+      "studentName","username","role","loginDate"
     ];
 
     try{
@@ -3352,18 +3098,6 @@ td.score{font-weight:900;direction:ltr}
     }catch(error){}
 
     window.__prudleStudentID = "";
-
-    state.studentKey = "";
-    state.studentName = "";
-    state.studentDocs = [];
-    state.courseIds = new Set();
-    state.openCourseIds = new Set();
-    state.openCourses = new Map();
-    state.openIndividual = [];
-    state.openHomework = [];
-    state.homeworkResults = [];
-    state.activityResults = [];
-    state.allActivityResults = [];
 
     window.location.replace(
       "https://www.prudle-education.com/log-in-out?logout=1&t=" + Date.now()
@@ -3388,7 +3122,7 @@ td.score{font-weight:900;direction:ltr}
       if(!ok){
         const msg = `
           <div class="prudle-empty-smart">
-            تعذر تحميل بيانات الطالب. إذا كنت تستخدم Safari، حدّث الصفحة مرة واحدة بعد تسجيل الدخول.
+            تعذر تحميل بيانات الطالب في هذه الصفحة.
           </div>
         `;
         const nf = document.getElementById("prudleNotificationFeed");
@@ -3403,7 +3137,7 @@ td.score{font-weight:900;direction:ltr}
 
       state.refreshTimer = setInterval(
         refreshNonRealtimeData,
-        60000
+        30000
       );
     }catch(error){
       console.error("Unable to start student notifications:",error);
@@ -3437,34 +3171,43 @@ td.score{font-weight:900;direction:ltr}
   window.addEventListener("load",startPrudleBoot,{once:true});
 
   /*
-    Safari may restore the page without event.persisted being true.
-    Re-read identity and data once whenever Safari shows the page.
+    Universal browser restore/refresh:
+    Safari, Chrome, Edge, Firefox and mobile browsers may restore a page
+    from memory without a full reload. Always refresh the student's
+    notifications/results when the page becomes active again.
   */
-  window.addEventListener("pageshow",function(event){
-    if(!isSafariBrowser && !(event && event.persisted)){
-      return;
-    }
-
+  window.addEventListener("pageshow",function(){
     state.studentKey = getStudentKey();
 
-    if(!state.studentKey){
-      return;
-    }
+    if(!state.studentKey) return;
 
-    setTimeout(function(){
-      loadStudentContext()
-        .then(function(ok){
-          if(!ok) return;
-          return refreshNonRealtimeData();
-        })
-        .then(function(){
-          renderAll();
-          listenIndividualSessions();
-        })
-        .catch(function(error){
-          console.warn("Safari pageshow refresh:",error);
-        });
-    },120);
+    loadStudentContext()
+      .then(function(ok){
+        if(!ok) return;
+        return refreshNonRealtimeData();
+      })
+      .then(function(){
+        renderAll();
+        listenIndividualSessions();
+      })
+      .catch(function(error){
+        console.warn("pageshow student refresh:",error);
+      });
+  });
+
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState !== "visible") return;
+
+    state.studentKey = getStudentKey();
+    if(!state.studentKey) return;
+
+    refreshNonRealtimeData()
+      .then(function(){
+        renderAll();
+      })
+      .catch(function(error){
+        console.warn("visibility student refresh:",error);
+      });
   });
 })();
 </script>
