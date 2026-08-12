@@ -551,6 +551,87 @@
     }
 
     /* =========================
+       TOP STUDENT ACTIONS
+       iPhone / Android safe
+    ========================== */
+    .hero-actions{
+      position:relative;
+      z-index:3;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .hero-action-btn{
+      position:relative;
+      min-height:44px;
+      border:1px solid rgba(255,255,255,.28);
+      border-radius:14px;
+      padding:10px 14px;
+      background:rgba(255,255,255,.16);
+      color:#fff;
+      font-family:inherit;
+      font-size:14px;
+      font-weight:900;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      cursor:pointer;
+      -webkit-appearance:none;
+      appearance:none;
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+
+    .hero-action-btn:hover{
+      background:rgba(255,255,255,.23);
+    }
+
+    .hero-notification-count{
+      min-width:23px;
+      height:23px;
+      padding:0 6px;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      background:#ef4444;
+      color:#fff;
+      font-size:10px;
+      font-weight:900;
+      border:2px solid rgba(255,255,255,.95);
+    }
+
+    .hero-notification-count.hidden{
+      display:none;
+    }
+
+    .hero-logout-btn{
+      background:rgba(185,28,28,.82);
+      border-color:rgba(255,255,255,.30);
+    }
+
+    @supports (padding: max(0px)) {
+      body{
+        padding-left:env(safe-area-inset-left);
+        padding-right:env(safe-area-inset-right);
+      }
+      .hero{
+        padding-top:max(22px, env(safe-area-inset-top));
+      }
+      .prudle-notification-fab{
+        left:max(12px, env(safe-area-inset-left));
+        bottom:max(14px, env(safe-area-inset-bottom));
+      }
+      .prudle-center-panel{
+        padding-top:max(18px, env(safe-area-inset-top));
+        padding-bottom:max(18px, env(safe-area-inset-bottom));
+      }
+    }
+
+    /* =========================
        RESPONSIVE
     ========================== */
     @media (max-width: 1100px) {
@@ -579,6 +660,20 @@
 
       .hero-title {
         font-size: 26px;
+      }
+
+      .hero-actions{
+        width:100%;
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:8px;
+      }
+
+      .hero-action-btn{
+        width:100%;
+        min-height:46px;
+        padding:10px 8px;
+        font-size:13px;
       }
 
       .hero-subtitle {
@@ -815,7 +910,9 @@
       left:0;
       z-index:9800;
       width:min(510px,96vw);
+      height:100vh;
       height:100dvh;
+      -webkit-overflow-scrolling:touch;
       background:#f6f9fd;
       box-shadow:18px 0 48px rgba(14,42,71,.24);
       transform:translateX(-105%);
@@ -1108,7 +1205,25 @@
             </div>
           </div>
 
-          <div class="hero-badge">✨ Prudle Smart Learning Portal</div>
+          <div class="hero-actions">
+            <button id="prudleTopNotificationBtn"
+                    class="hero-action-btn"
+                    type="button"
+                    aria-label="الإشعارات"
+                    onclick="openPrudleStudentCenter('notifications')">
+              <i class="fa-solid fa-bell"></i>
+              <span>الإشعارات</span>
+              <span id="prudleTopNotificationCount" class="hero-notification-count hidden">0</span>
+            </button>
+
+            <button class="hero-action-btn hero-logout-btn"
+                    type="button"
+                    aria-label="تسجيل خروج الطالب"
+                    onclick="prudleStudentLogout()">
+              <i class="fa-solid fa-right-from-bracket"></i>
+              <span>تسجيل الخروج</span>
+            </button>
+          </div>
         </div>
 
         <div class="hero-stats">
@@ -2385,6 +2500,14 @@
       fabCount.classList.toggle("hidden",total === 0);
     }
 
+    const topNotificationCount =
+      document.getElementById("prudleTopNotificationCount");
+
+    if(topNotificationCount){
+      topNotificationCount.textContent = String(total);
+      topNotificationCount.classList.toggle("hidden",total === 0);
+    }
+
     const note = document.getElementById("prudleSmartNotificationText");
     if(note){
       note.textContent = total
@@ -2638,6 +2761,25 @@ window.onload=function(){setTimeout(function(){window.print();},300);};
       ?.classList.toggle("active",!notifications);
   };
 
+  window.prudleStudentLogout = function(){
+    try{
+      localStorage.setItem("studentLoggedOut","1");
+      localStorage.removeItem("studentID");
+      localStorage.removeItem("student_iqama");
+      localStorage.removeItem("studentLoginDate");
+      localStorage.removeItem("studentName");
+      localStorage.removeItem("studentPhone");
+      localStorage.removeItem("studentCourseId");
+
+      try{
+        sessionStorage.removeItem("studentID");
+        sessionStorage.removeItem("student_iqama");
+      }catch(_e){}
+    }catch(_e){}
+
+    location.replace("https://www.prudle-education.com/log-in-out");
+  };
+
   window.goActivities = function(){
     const id = String(getStudentKey() || "").trim();
 
@@ -2669,7 +2811,31 @@ window.onload=function(){setTimeout(function(){window.print();},300);};
     }
   }
 
-  window.addEventListener("load",boot);
+  let prudleBootStarted = false;
+
+  async function startPrudleBootOnce(){
+    if(prudleBootStarted) return;
+    prudleBootStarted = true;
+    await boot();
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded",startPrudleBootOnce,{once:true});
+  }else{
+    startPrudleBootOnce();
+  }
+
+  window.addEventListener("load",startPrudleBootOnce,{once:true});
+
+  // Safari / iPhone can restore the page from bfcache without a normal reload.
+  window.addEventListener("pageshow",function(){
+    if(!state.studentKey){
+      prudleBootStarted = false;
+      startPrudleBootOnce();
+    }else{
+      refreshNonRealtimeData();
+    }
+  });
 })();
 </script>
 
