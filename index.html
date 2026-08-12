@@ -1147,38 +1147,206 @@
 </style>
 
 
-<style id="prudle-all-browser-compatibility">
-  /* Universal mobile viewport fallback */
-  #prudleStudentCenterPanel{
-    height:100vh !important;
-    min-height:100vh !important;
-    overflow-y:auto !important;
-    -webkit-overflow-scrolling:touch;
+<style id="prudle-activity-details-cross-browser-style">
+  html.prudle-modal-open,
+  html.prudle-modal-open body{
+    overflow:hidden !important;
   }
 
-  @supports (height:100dvh){
-    #prudleStudentCenterPanel{
-      height:100dvh !important;
-      min-height:100dvh !important;
-    }
+  .prudle-activity-result-card{
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
   }
 
-  @supports not (backdrop-filter: blur(1px)){
-    .portal-wrap{
-      background:#ffffff;
-    }
-  }
-
-  button,
-  a{
+  .prudle-activity-details-btn{
+    border:0;
+    border-radius:11px;
+    padding:9px 12px;
+    background:#164478;
+    color:#fff;
+    font-family:inherit;
+    font-size:11px;
+    font-weight:900;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    min-height:40px;
+    -webkit-appearance:none;
+    appearance:none;
     -webkit-tap-highlight-color:transparent;
   }
 
+  .prudle-activity-modal{
+    position:fixed;
+    top:0;
+    right:0;
+    bottom:0;
+    left:0;
+    z-index:99999;
+    background:rgba(10,30,52,.68);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    overflow:hidden;
+  }
+
+  .prudle-activity-modal-card{
+    width:760px;
+    max-width:96vw;
+    max-height:90vh;
+    background:#fff;
+    border-radius:22px;
+    box-shadow:0 25px 70px rgba(0,0,0,.30);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  .prudle-activity-modal-head{
+    padding:17px 19px;
+    background:linear-gradient(135deg,#164478,#2467a5);
+    color:#fff;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    flex:0 0 auto;
+  }
+
+  .prudle-activity-modal-title{
+    font-size:19px;
+    font-weight:900;
+    line-height:1.5;
+  }
+
+  .prudle-activity-modal-summary{
+    font-size:12px;
+    opacity:.92;
+    margin-top:4px;
+    line-height:1.8;
+  }
+
+  .prudle-activity-modal-close{
+    border:0;
+    border-radius:10px;
+    width:40px;
+    height:40px;
+    min-width:40px;
+    background:rgba(255,255,255,.16);
+    color:#fff;
+    font-size:22px;
+    cursor:pointer;
+    -webkit-appearance:none;
+    appearance:none;
+  }
+
+  .prudle-activity-modal-body{
+    padding:16px;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    display:grid;
+    gap:10px;
+    flex:1 1 auto;
+  }
+
+  .prudle-answer-detail{
+    border:1px solid #e2eaf3;
+    border-radius:14px;
+    padding:12px;
+    background:#fff;
+  }
+
+  .prudle-answer-detail.correct{
+    background:#f3fff8;
+    border-color:#c9f1dc;
+  }
+
+  .prudle-answer-detail.wrong{
+    background:#fff7f7;
+    border-color:#f2d4d4;
+  }
+
+  .prudle-answer-question{
+    font-weight:900;
+    color:#164478;
+    margin-bottom:7px;
+    line-height:1.7;
+  }
+
+  .prudle-answer-line{
+    font-size:12px;
+    line-height:1.9;
+    color:#52677d;
+    overflow-wrap:anywhere;
+  }
+
+  .prudle-answer-status{
+    margin-top:7px;
+    font-weight:900;
+    font-size:12px;
+  }
+
+  .prudle-answer-detail.correct .prudle-answer-status{
+    color:#0f9f6e;
+  }
+
+  .prudle-answer-detail.wrong .prudle-answer-status{
+    color:#dc2626;
+  }
+
+  .prudle-answer-detail.neutral .prudle-answer-status{
+    color:#64748b;
+  }
+
+  .prudle-activity-no-answers{
+    padding:22px;
+    text-align:center;
+    color:#71869b;
+    line-height:1.8;
+  }
+
+  @supports (height:100dvh){
+    .prudle-activity-modal-card{
+      max-height:90dvh;
+    }
+  }
+
   @media(max-width:760px){
-    #prudleStudentCenterPanel{
-      width:100% !important;
-      max-width:100% !important;
-      left:0 !important;
+    .prudle-activity-modal{
+      padding:
+        max(10px,env(safe-area-inset-top))
+        max(10px,env(safe-area-inset-right))
+        max(10px,env(safe-area-inset-bottom))
+        max(10px,env(safe-area-inset-left));
+      align-items:flex-end;
+    }
+
+    .prudle-activity-modal-card{
+      width:100%;
+      max-width:100%;
+      max-height:92vh;
+      border-radius:20px 20px 12px 12px;
+    }
+
+    .prudle-activity-modal-head{
+      padding:14px;
+    }
+
+    .prudle-activity-modal-title{
+      font-size:17px;
+    }
+
+    .prudle-activity-modal-body{
+      padding:12px;
+    }
+
+    .prudle-activity-details-btn{
+      width:100%;
+      min-height:44px;
     }
   }
 </style>
@@ -1601,255 +1769,7 @@
     firebase.initializeApp(FIREBASE_CONFIG);
   }
 
-  /*
-    Browser compatibility:
-    - Chrome / Edge / Firefox / Android: keep the normal Firestore SDK.
-    - Safari / iPhone: SDK reads are allowed, but every important read has
-      a Firestore REST fallback. This bypasses Safari/WebChannel problems.
-  */
-  var isSafariBrowser = (function(){
-    var ua = navigator.userAgent || "";
-    return /Safari/i.test(ua) &&
-           !/Chrome|CriOS|Chromium|Edg|OPR|FxiOS/i.test(ua);
-  })();
-
   const db = firebase.firestore();
-
-  const FIRESTORE_REST_BASE =
-    "https://firestore.googleapis.com/v1/projects/" +
-    FIREBASE_CONFIG.projectId +
-    "/databases/(default)/documents";
-
-  function restDecodeValue(value){
-    if(!value || typeof value !== "object") return null;
-
-    if(Object.prototype.hasOwnProperty.call(value,"nullValue")) return null;
-    if(Object.prototype.hasOwnProperty.call(value,"stringValue")) return value.stringValue;
-    if(Object.prototype.hasOwnProperty.call(value,"booleanValue")) return !!value.booleanValue;
-    if(Object.prototype.hasOwnProperty.call(value,"integerValue")) return Number(value.integerValue);
-    if(Object.prototype.hasOwnProperty.call(value,"doubleValue")) return Number(value.doubleValue);
-    if(Object.prototype.hasOwnProperty.call(value,"timestampValue")) return value.timestampValue;
-    if(Object.prototype.hasOwnProperty.call(value,"referenceValue")) return value.referenceValue;
-    if(Object.prototype.hasOwnProperty.call(value,"bytesValue")) return value.bytesValue;
-
-    if(value.geoPointValue){
-      return {
-        latitude:Number(value.geoPointValue.latitude || 0),
-        longitude:Number(value.geoPointValue.longitude || 0)
-      };
-    }
-
-    if(value.arrayValue){
-      var values = value.arrayValue.values || [];
-      return values.map(restDecodeValue);
-    }
-
-    if(value.mapValue){
-      return restDecodeFields(value.mapValue.fields || {});
-    }
-
-    return null;
-  }
-
-  function restDecodeFields(fields){
-    var obj = {};
-    fields = fields || {};
-    Object.keys(fields).forEach(function(key){
-      obj[key] = restDecodeValue(fields[key]);
-    });
-    return obj;
-  }
-
-  function restDocObject(raw){
-    if(!raw || !raw.name) return null;
-    var parts = raw.name.split("/");
-    return {
-      id:parts[parts.length - 1],
-      data:restDecodeFields(raw.fields || {}),
-      raw:raw
-    };
-  }
-
-  async function restFetchJson(url,options){
-    var response = await fetch(url,options || {});
-    if(!response.ok){
-      var body = "";
-      try{ body = await response.text(); }catch(error){}
-      throw new Error("Firestore REST " + response.status + " " + body);
-    }
-    return response.json();
-  }
-
-  async function restGetCollection(collectionName){
-    var rows = [];
-    var pageToken = "";
-
-    do{
-      var url =
-        FIRESTORE_REST_BASE + "/" + encodeURIComponent(collectionName) +
-        "?pageSize=1000&key=" + encodeURIComponent(FIREBASE_CONFIG.apiKey);
-
-      if(pageToken){
-        url += "&pageToken=" + encodeURIComponent(pageToken);
-      }
-
-      var json = await restFetchJson(url,{
-        method:"GET",
-        cache:"no-store"
-      });
-
-      (json.documents || []).forEach(function(raw){
-        var doc = restDocObject(raw);
-        if(doc) rows.push(doc);
-      });
-
-      pageToken = json.nextPageToken || "";
-    }while(pageToken);
-
-    return rows;
-  }
-
-  async function restGetDocument(collectionName,docId){
-    var url =
-      FIRESTORE_REST_BASE + "/" +
-      encodeURIComponent(collectionName) + "/" +
-      encodeURIComponent(docId) +
-      "?key=" + encodeURIComponent(FIREBASE_CONFIG.apiKey);
-
-    var json = await restFetchJson(url,{
-      method:"GET",
-      cache:"no-store"
-    });
-
-    return restDocObject(json);
-  }
-
-  async function restRunEqual(collectionName,fieldName,value){
-    var url =
-      "https://firestore.googleapis.com/v1/projects/" +
-      FIREBASE_CONFIG.projectId +
-      "/databases/(default)/documents:runQuery?key=" +
-      encodeURIComponent(FIREBASE_CONFIG.apiKey);
-
-    var body = {
-      structuredQuery:{
-        from:[{collectionId:collectionName}],
-        where:{
-          fieldFilter:{
-            field:{fieldPath:fieldName},
-            op:"EQUAL",
-            value:{stringValue:String(value)}
-          }
-        }
-      }
-    };
-
-    var json = await restFetchJson(url,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(body),
-      cache:"no-store"
-    });
-
-    var rows = [];
-    (json || []).forEach(function(item){
-      if(item && item.document){
-        var doc = restDocObject(item.document);
-        if(doc) rows.push(doc);
-      }
-    });
-    return rows;
-  }
-
-  function compatSnapshotFromRows(rows){
-    return {
-      docs:(rows || []).map(function(row){
-        return {
-          id:row.id,
-          exists:true,
-          data:function(){ return row.data; }
-        };
-      })
-    };
-  }
-
-  async function compatCollectionGet(collectionName){
-    /*
-      Safari goes through REST first because this is the part that was
-      returning empty/no reports for the user. Other browsers keep SDK first.
-    */
-    if(isSafariBrowser){
-      try{
-        return compatSnapshotFromRows(
-          await restGetCollection(collectionName)
-        );
-      }catch(restError){
-        console.warn("Safari REST collection fallback:",collectionName,restError);
-        return db.collection(collectionName).get();
-      }
-    }
-
-    try{
-      return await db.collection(collectionName).get();
-    }catch(sdkError){
-      console.warn("SDK collection fallback to REST:",collectionName,sdkError);
-      return compatSnapshotFromRows(
-        await restGetCollection(collectionName)
-      );
-    }
-  }
-
-  async function compatDocumentGet(collectionName,docId){
-    if(isSafariBrowser){
-      try{
-        var row = await restGetDocument(collectionName,docId);
-        return {
-          id:row.id,
-          exists:true,
-          data:function(){ return row.data; }
-        };
-      }catch(restError){
-        console.warn("Safari REST document fallback:",collectionName,docId,restError);
-        return db.collection(collectionName).doc(docId).get();
-      }
-    }
-
-    try{
-      return await db.collection(collectionName).doc(docId).get();
-    }catch(sdkError){
-      var row2 = await restGetDocument(collectionName,docId);
-      return {
-        id:row2.id,
-        exists:true,
-        data:function(){ return row2.data; }
-      };
-    }
-  }
-
-  async function compatEqualQuery(collectionName,fieldName,value){
-    if(isSafariBrowser){
-      try{
-        return compatSnapshotFromRows(
-          await restRunEqual(collectionName,fieldName,value)
-        );
-      }catch(restError){
-        console.warn("Safari REST query fallback:",collectionName,restError);
-        return db.collection(collectionName)
-          .where(fieldName,"==",value)
-          .get();
-      }
-    }
-
-    try{
-      return await db.collection(collectionName)
-        .where(fieldName,"==",value)
-        .get();
-    }catch(sdkError){
-      return compatSnapshotFromRows(
-        await restRunEqual(collectionName,fieldName,value)
-      );
-    }
-  }
 
   const state = {
     studentKey:"",
@@ -1866,7 +1786,6 @@
     examMap:new Map(),
     lastNotificationSignature:"",
     individualUnsubscribe:null,
-    individualPollTimer:null,
     refreshTimer:null
   };
 
@@ -1879,14 +1798,9 @@
     .replace(/'/g,"&#039;");
 
   function getStudentKey(){
-    var params;
-    try{
-      params = new URLSearchParams(location.search);
-    }catch(error){
-      params = { get:function(){ return ""; } };
-    }
+    const params = new URLSearchParams(location.search);
 
-    var stored = "";
+    let stored = "";
     try{
       stored =
         localStorage.getItem("studentID") ||
@@ -1898,39 +1812,16 @@
       console.warn("Student storage access:",error);
     }
 
-    var cookieID = "";
-    try{
-      var match = document.cookie.match(/(?:^|;\s*)prudleStudentID=([^;]+)/);
-      cookieID = match ? decodeURIComponent(match[1]) : "";
-    }catch(error){}
-
-    var key = safe(
+    const key = safe(
       params.get("studentID") ||
       params.get("student_iqama") ||
       window.__prudleStudentID ||
       stored ||
-      cookieID ||
       ""
     );
 
     if(key){
       window.__prudleStudentID = key;
-
-      try{
-        localStorage.setItem("studentID",key);
-        localStorage.setItem("student_iqama",key);
-      }catch(error){}
-
-      try{
-        sessionStorage.setItem("studentID",key);
-        sessionStorage.setItem("student_iqama",key);
-      }catch(error){}
-
-      try{
-        document.cookie =
-          "prudleStudentID=" + encodeURIComponent(key) +
-          "; path=/; max-age=2592000; SameSite=Lax; Secure";
-      }catch(error){}
     }
 
     return key;
@@ -1956,9 +1847,9 @@
     }
 
     const category = safe(
-      (exam && exam.examCategory) ||
-      (exam && exam.examType) ||
-      (exam && exam.category)
+      exam && exam.examCategory ||
+      exam && exam.examType ||
+      exam && exam.category
     ).toLowerCase();
 
     return category === "homework";
@@ -1966,18 +1857,18 @@
 
   function isQuizExam(exam){
     const category = safe(
-      (exam && exam.examCategory) ||
-      (exam && exam.examType) ||
-      (exam && exam.category) ||
-      (exam && exam.type) ||
+      exam && exam.examCategory ||
+      exam && exam.examType ||
+      exam && exam.category ||
+      exam && exam.type ||
       ""
     ).toLowerCase();
 
-    const skill = safe((exam && exam.examSkill) || "").toLowerCase();
+    const skill = safe(exam && exam.examSkill || "").toLowerCase();
     const title = safe(
-      (exam && exam.title) ||
-      (exam && exam.examTitle) ||
-      (exam && exam.name) ||
+      exam && exam.title ||
+      exam && exam.examTitle ||
+      exam && exam.name ||
       ""
     ).toLowerCase();
 
@@ -1999,14 +1890,14 @@
   */
   function isHomeworkQuestion(question){
     const skill = safe(
-      (question && question.skill) ||
-      (question && question.examSkill) ||
+      question && question.skill ||
+      question && question.examSkill ||
       ""
     ).toLowerCase();
 
     const group = safe(
-      (question && question.group) ||
-      (question && question.category) ||
+      question && question.group ||
+      question && question.category ||
       ""
     ).toLowerCase();
 
@@ -2019,7 +1910,7 @@
 
   function visibleQuestionIds(exam,courseId){
     const map =
-      (exam && exam.visibleQuestionsByCourse) &&
+      exam && exam.visibleQuestionsByCourse &&
       typeof exam.visibleQuestionsByCourse === "object"
         ? exam.visibleQuestionsByCourse
         : {};
@@ -2031,88 +1922,6 @@
     return Array.isArray(map[courseId])
       ? map[courseId].map(safe).filter(Boolean)
       : [];
-  }
-
-  function courseBelongsToStudent(courseId){
-    courseId = safe(courseId);
-    if(!courseId) return false;
-
-    /*
-      Normal case: use the successfully loaded OPEN courses.
-      Fail-safe case: if the Courses collection/document could not be loaded
-      in a browser, still use the student's own courseIds so reports and
-      notifications do not disappear.
-    */
-    if(state.openCourseIds && state.openCourseIds.size){
-      return state.openCourseIds.has(courseId);
-    }
-
-    return state.courseIds && state.courseIds.has(courseId);
-  }
-
-  function activityVisibleForStudent(item){
-    item = item || {};
-
-    const courseId = safe(
-      item.courseId ||
-      item.participantCourseId ||
-      item.sourceCourseId ||
-      item.trainingCourseId ||
-      ""
-    );
-
-    if(courseId && !courseBelongsToStudent(courseId)){
-      return false;
-    }
-
-    const studentKey = safe(state.studentKey);
-    const studentDocIds = new Set(
-      (state.studentDocs || [])
-        .map(function(row){ return safe(row.id); })
-        .filter(Boolean)
-    );
-
-    /*
-      If the activity explicitly targets students, honor that list.
-      Support the common field names used by different Prudle activity pages.
-    */
-    const possibleTargets = [
-      item.studentId,
-      item.studentID,
-      item.studentIqama,
-      item.participantId,
-      item.targetStudentId,
-      item.targetStudentID
-    ].map(safe).filter(Boolean);
-
-    if(possibleTargets.length){
-      return possibleTargets.some(function(value){
-        return value === studentKey || studentDocIds.has(value);
-      });
-    }
-
-    const arrays = [
-      item.studentIds,
-      item.studentIDs,
-      item.studentIqamas,
-      item.participantIds,
-      item.allowedStudents,
-      item.visibleToStudents
-    ];
-
-    for(let i=0;i<arrays.length;i++){
-      if(Array.isArray(arrays[i]) && arrays[i].length){
-        const values = arrays[i].map(safe);
-        return values.indexOf(studentKey) !== -1 ||
-               values.some(function(value){ return studentDocIds.has(value); });
-      }
-    }
-
-    /*
-      No explicit student restriction means it is visible to students
-      in the relevant course.
-    */
-    return !courseId || courseBelongsToStudent(courseId);
   }
 
   function resultMatchesStudent(row){
@@ -2140,54 +1949,15 @@
       return false;
     }
 
-    let studentDocs = [];
+    const studentSnap = await db
+      .collection("students")
+      .where("iqama","==",state.studentKey)
+      .get();
 
-    /* Fast path */
-    try{
-      const exactSnap = await compatEqualQuery(
-        "students",
-        "iqama",
-        state.studentKey
-      );
-
-      studentDocs = exactSnap.docs.map(function(doc){
-        return Object.assign({id:doc.id},doc.data());
-      });
-    }catch(error){
-      console.warn("Exact student query:",error);
-    }
-
-    /*
-      Critical cross-browser fallback:
-      An empty exact query is NOT treated as a final answer.
-      Read the collection and match all Prudle student-ID field variants.
-    */
-    if(!studentDocs.length){
-      try{
-        const allSnap = await compatCollectionGet("students");
-        studentDocs = allSnap.docs
-          .map(function(doc){
-            return Object.assign({id:doc.id},doc.data());
-          })
-          .filter(function(item){
-            const values = [
-              item.iqama,
-              item.studentIqama,
-              item.studentID,
-              item.studentId,
-              item.ID,
-              item.idNumber,
-              item.username
-            ].map(safe);
-
-            return values.indexOf(state.studentKey) !== -1;
-          });
-      }catch(error){
-        console.warn("Student collection fallback:",error);
-      }
-    }
-
-    state.studentDocs = studentDocs;
+    state.studentDocs = studentSnap.docs.map(doc=>({
+      id:doc.id,
+      ...doc.data()
+    }));
 
     if(!state.studentDocs.length){
       return false;
@@ -2195,70 +1965,37 @@
 
     state.studentName =
       safe(state.studentDocs[0] && state.studentDocs[0].name) ||
-      safe(state.studentDocs[0] && state.studentDocs[0].studentName) ||
       "Student";
 
     state.courseIds = new Set(
       state.studentDocs
-        .map(function(item){
-          return safe(
-            item.courseId ||
-            item.CourseId ||
-            item.trainingCourseId ||
-            item.courseID
-          );
-        })
+        .map(item=>safe(item.courseId))
         .filter(Boolean)
     );
 
-    const coursePairs = await Promise.all(
-      Array.from(state.courseIds).map(async function(courseId){
-        try{
-          const doc = await compatDocumentGet("Courses",courseId);
-          if(doc && doc.exists){
-            return {
-              id:doc.id,
-              data:Object.assign({id:doc.id},doc.data())
-            };
-          }
-        }catch(error){
-          console.warn("Course load:",courseId,error);
-        }
-        return {id:courseId,data:{id:courseId,status:"open",_fallback:true}};
-      })
+    const courseDocs = await Promise.all(
+      [...state.courseIds].map(courseId=>
+        db.collection("Courses").doc(courseId).get()
+      )
     );
 
-    /*
-      If course metadata is available, respect closed courses.
-      If a browser could not load course metadata, fail open ONLY for a course
-      already attached to this student. This prevents Safari from showing
-      an empty center simply because Courses failed to load.
-    */
     state.openCourses = new Map(
-      coursePairs
-        .filter(function(pair){
-          const status = safe(pair.data && pair.data.status).toLowerCase();
-          return pair.data && (
-            pair.data._fallback === true ||
-            !status ||
-            status === "open"
-          );
-        })
-        .map(function(pair){
-          return [safe(pair.id),pair.data];
-        })
+      courseDocs
+        .filter(doc=>doc.exists)
+        .map(doc=>[doc.id,{id:doc.id,...doc.data()}])
+        .filter(([,course])=>
+          safe(course.status).toLowerCase() === "open"
+        )
     );
 
     state.openCourseIds = new Set(state.openCourses.keys());
 
-    /* Absolute fallback: student's linked courses remain visible. */
-    if(!state.openCourseIds.size && state.courseIds.size){
-      state.openCourseIds = new Set(state.courseIds);
-    }
-
     const smartTools =
       document.getElementById("prudleStudentSmartTools");
     if(smartTools) smartTools.style.display = "grid";
+
+    var oldFab = document.getElementById("prudleStudentNotificationFab");
+    if(oldFab) oldFab.classList.add("show");
 
     const centerName =
       document.getElementById("prudleStudentCenterName");
@@ -2274,36 +2011,21 @@
     let docs = [];
 
     try{
-      const snap = await compatEqualQuery(
-        "results",
-        "studentIqama",
-        state.studentKey
-      );
+      const snap = await db
+        .collection("results")
+        .where("studentIqama","==",state.studentKey)
+        .get();
 
-      docs = snap.docs.map(function(doc){
-        return Object.assign({id:doc.id},doc.data());
-      });
+      docs = snap.docs.map(doc=>({
+        id:doc.id,
+        ...doc.data()
+      }));
     }catch(error){
-      console.warn("Result exact query:",error);
-    }
-
-    /*
-      Do not accept an empty exact query as proof that the student has no data.
-      This fixes type/field differences and browser transport differences.
-    */
-    if(!docs.length){
-      try{
-        const snap = await compatCollectionGet("results");
-        docs = snap.docs
-          .map(function(doc){
-            return Object.assign({id:doc.id},doc.data());
-          })
-          .filter(resultMatchesStudent);
-      }catch(error){
-        console.warn("Result collection fallback:",error);
-      }
-    }else{
-      docs = docs.filter(resultMatchesStudent);
+      console.warn("Result query fallback:",error);
+      const snap = await db.collection("results").get();
+      docs = snap.docs
+        .map(doc=>({id:doc.id,...doc.data()}))
+        .filter(resultMatchesStudent);
     }
 
     return docs;
@@ -2313,32 +2035,21 @@
     let docs = [];
 
     try{
-      const snap = await compatEqualQuery(
-        "FunActivityResults",
-        "participantId",
-        state.studentKey
-      );
+      const snap = await db
+        .collection("FunActivityResults")
+        .where("participantId","==",state.studentKey)
+        .get();
 
-      docs = snap.docs.map(function(doc){
-        return Object.assign({id:doc.id},doc.data());
-      });
+      docs = snap.docs.map(doc=>({
+        id:doc.id,
+        ...doc.data()
+      }));
     }catch(error){
-      console.warn("Activity result exact query:",error);
-    }
-
-    if(!docs.length){
-      try{
-        const snap = await compatCollectionGet("FunActivityResults");
-        docs = snap.docs
-          .map(function(doc){
-            return Object.assign({id:doc.id},doc.data());
-          })
-          .filter(resultMatchesStudent);
-      }catch(error){
-        console.warn("Activity result collection fallback:",error);
-      }
-    }else{
-      docs = docs.filter(resultMatchesStudent);
+      console.warn("Activity result query fallback:",error);
+      const snap = await db.collection("FunActivityResults").get();
+      docs = snap.docs
+        .map(doc=>({id:doc.id,...doc.data()}))
+        .filter(resultMatchesStudent);
     }
 
     return docs;
@@ -2353,8 +2064,8 @@
     */
     const [examSnap, questionSnap, resultRows] =
       await Promise.all([
-        compatCollectionGet("exams"),
-        compatCollectionGet("questions"),
+        db.collection("exams").get(),
+        db.collection("questions").get(),
         readStudentExamResults()
       ]);
 
@@ -2503,7 +2214,7 @@
         return (
           homeworkExamIds.has(safe(row.examId)) &&
           courseId &&
-          courseBelongsToStudent(courseId)
+          state.openCourseIds.has(courseId)
         );
       });
   }
@@ -2607,7 +2318,7 @@
 
         return (
           courseId &&
-          courseBelongsToStudent(courseId)
+          state.openCourseIds.has(courseId)
         );
       })
       .sort((a,b)=>
@@ -2627,12 +2338,12 @@
 
     setTimeout(async function(){
       try{
-        const snap = await compatCollectionGet("FunActivityResults");
+        const snap = await db.collection("FunActivityResults").get();
         const allRows = snap.docs.map(doc=>({id:doc.id,...doc.data()}));
 
         state.allActivityResults = allRows.filter(row=>{
           const courseId = activityCourseId(row);
-          return courseId && courseBelongsToStudent(courseId);
+          return courseId && state.openCourseIds.has(courseId);
         });
 
         renderAll();
@@ -2645,62 +2356,62 @@
 
   function listenIndividualSessions(){
     if(state.individualUnsubscribe){
-      try{ state.individualUnsubscribe(); }catch(error){}
+      state.individualUnsubscribe();
       state.individualUnsubscribe = null;
     }
 
-    if(state.individualPollTimer){
-      clearInterval(state.individualPollTimer);
-      state.individualPollTimer = null;
-    }
-
-    async function pollIndividualSessions(){
-      try{
-        const snap =
-          await compatCollectionGet("FunActivityLiveSessions");
-
-        const rows = snap.docs.map(function(doc){
-          return Object.assign({id:doc.id},doc.data());
-        });
-
-        state.openIndividual = rows
-          .filter(function(item){
-            return (
+    state.individualUnsubscribe =
+      db.collection("FunActivityLiveSessions")
+        .onSnapshot(snapshot=>{
+          const rows = snapshot.docs
+            .map(doc=>({id:doc.id,...doc.data()}))
+            .filter(item=>
               safe(item.mode).toLowerCase() === "individual" &&
               safe(item.status).toLowerCase() === "active" &&
-              activityVisibleForStudent(item) &&
+              item.studentVisible !== false &&
+              state.openCourseIds.has(safe(item.courseId)) &&
               !hasSolvedActivity(item)
+            )
+            .sort((a,b)=>
+              timestampValue(b.updatedAt || b.startedAt) -
+              timestampValue(a.updatedAt || a.startedAt)
             );
-          })
-          .sort(function(a,b){
-            return (
-              timestampValue(b.createdAt || b.updatedAt) -
-              timestampValue(a.createdAt || a.updatedAt)
-            );
-          });
 
-        renderAll();
-        maybeToastNewItems();
-      }catch(error){
-        console.warn("Live activity notification refresh:",error);
-      }
+          state.openIndividual = rows;
+          renderAll();
+          maybeToastNewItems();
+        },error=>{
+          console.warn("Individual notifications:",error);
+        });
+  }
+
+  function formatScore(score,total,percent){
+    const s = Number(score || 0);
+    const t = Number(total || 0);
+    const p = Number(percent || 0);
+
+    return {
+      scoreText: t > 0 ? `${s} / ${t}` : String(s),
+      percentText: Number.isFinite(p) ? `${Math.round(p)}%` : ""
+    };
+  }
+
+  function notificationLink(type,item){
+    const id = encodeURIComponent(state.studentKey);
+
+    if(type === "individual"){
+      return (
+        "https://www.prudle-education.com/studentss-activity" +
+        "?studentID=" + id +
+        "&activityId=" + encodeURIComponent(safe(item.activityId)) +
+        "&courseId=" + encodeURIComponent(safe(item.courseId))
+      );
     }
 
-    /*
-      Same method for Safari, Chrome, Android, Edge and Firefox.
-      No browser depends on Firestore realtime WebChannel.
-    */
-    pollIndividualSessions();
-
-    state.individualPollTimer =
-      setInterval(pollIndividualSessions,15000);
-
-    state.individualUnsubscribe = function(){
-      if(state.individualPollTimer){
-        clearInterval(state.individualPollTimer);
-        state.individualPollTimer = null;
-      }
-    };
+    return (
+      "https://www.prudle-education.com/homework-students" +
+      "?studentID=" + id
+    );
   }
 
   function renderNotifications(){
@@ -2790,180 +2501,419 @@
   }
 
   function renderHistory(){
-    const feed =
-      document.getElementById("prudleHistoryFeed");
-
+    var feed = document.getElementById("prudleHistoryFeed");
     if(!feed) return;
 
-    const rows = [];
+    var rows = [];
 
+    /* =======================================================
+       HOMEWORK / QUIZ
+       Same simple result presentation: grade only.
+       No answer-detail popup for homework/quiz.
+    ======================================================== */
     state.homeworkResults
       .slice()
-      .sort((a,b)=>
-        timestampValue(b.createdAt) -
-        timestampValue(a.createdAt)
-      )
-      .forEach(item=>{
-        const score =
-          formatScore(
-            item.score,
-            item.totalDegree,
-            item.percent
-          );
+      .sort(function(a,b){
+        return timestampValue(b.createdAt || b.updatedAt) -
+               timestampValue(a.createdAt || a.updatedAt);
+      })
+      .forEach(function(item){
+        var exam = state.examMap.get(safe(item.examId)) || {};
+        var isQuiz =
+          isQuizExam(exam) &&
+          !isHomeworkExam(exam);
 
-        rows.push(`
-          <article class="prudle-feed-item result">
-            <div class="prudle-item-top">
-              <div>
-                <div class="prudle-item-title">
-                  ${escHtml(item.examTitle || "واجب")}
-                </div>
-                <div class="prudle-item-course">
-                  واجب مكتمل
-                </div>
-              </div>
-              <span class="prudle-item-type">
-                <i class="fa-solid fa-check"></i>
-                Homework
-              </span>
-            </div>
-            <div class="prudle-item-score">
-              <div>
-                <small>الدرجة</small>
-                <strong>${escHtml(score.scoreText)}</strong>
-              </div>
-              <strong>${escHtml(score.percentText)}</strong>
-            </div>
-          </article>
-        `);
-      });
-
-    state.activityResults.forEach(item=>{
-      const score =
-        formatScore(
-          (item.score != null ? item.score : item.totalCorrectAnswers),
-          (item.total != null ? item.total : item.totalAnswered),
+        var score = formatScore(
+          item.score,
+          item.totalDegree || item.total || item.maxScore,
           item.percent
         );
-      const ranking = activityRank(item);
-      const medal = ranking.rank === 1 ? '🥇' : ranking.rank === 2 ? '🥈' : ranking.rank === 3 ? '🥉' : '🏆';
 
-      rows.push(`
-        <article class="prudle-feed-item result"
-                 style="cursor:pointer"
-                 onclick="openPrudleActivityDetails('${escHtml(item.id)}')"
-                 title="اضغط لعرض تفاصيل إجابات النشاط">
-          <div class="prudle-item-top">
-            <div>
-              <div class="prudle-item-title">
-                ${escHtml(item.activityTitle || "نشاط")}
-              </div>
-              <div class="prudle-item-course">
-                ${escHtml(item.courseName || item.participantCourseName || "")}
-              </div>
-            </div>
-            <span class="prudle-item-type">
-              <i class="fa-solid fa-puzzle-piece"></i>
-              Activity
-            </span>
-          </div>
+        var course =
+          state.openCourses.get(safe(item.courseId)) || {};
 
-          <div class="prudle-item-meta">
-            ${item.group ? `<span>${escHtml(item.group)}</span>` : ""}
-            ${item.trainerName ? `<span>${escHtml(item.trainerName)}</span>` : ""}
-            <span><i class="fa-solid fa-ranking-star"></i> ترتيبك: ${medal} ${rankArabic(ranking.rank)} من ${ranking.total}</span>
-          </div>
+        var courseName = safe(
+          course.TrainingCourse ||
+          course.Program ||
+          item.courseName ||
+          item.trainingCourse ||
+          ""
+        );
 
-          <div class="prudle-item-score">
-            <div>
-              <small>النتيجة النهائية</small>
-              <strong>${escHtml(score.scoreText)}</strong>
-            </div>
-            <strong>${escHtml(score.percentText)}</strong>
-          </div>
-          <div class="prudle-item-action">
-            <a href="javascript:void(0)" onclick="event.stopPropagation();openPrudleActivityDetails('${escHtml(item.id)}')">
-              عرض تفاصيل الإجابات
-              <i class="fa-solid fa-list-check"></i>
-            </a>
-          </div>
-        </article>
-      `);
-    });
+        rows.push(
+          '<article class="prudle-feed-item result">' +
+            '<div class="prudle-item-top">' +
+              '<div>' +
+                '<div class="prudle-item-title">' +
+                  escHtml(
+                    item.examTitle ||
+                    exam.title ||
+                    exam.examTitle ||
+                    (isQuiz ? "Quiz" : "واجب")
+                  ) +
+                '</div>' +
+                '<div class="prudle-item-course">' +
+                  escHtml(courseName || (isQuiz ? "كويز مكتمل" : "واجب مكتمل")) +
+                '</div>' +
+              '</div>' +
+              '<span class="prudle-item-type">' +
+                '<i class="fa-solid fa-check"></i> ' +
+                (isQuiz ? "Quiz" : "Homework") +
+              '</span>' +
+            '</div>' +
+            '<div class="prudle-item-score">' +
+              '<div>' +
+                '<small>النتيجة النهائية</small>' +
+                '<strong>' + escHtml(score.scoreText) + '</strong>' +
+              '</div>' +
+              '<strong>' + escHtml(score.percentText) + '</strong>' +
+            '</div>' +
+          '</article>'
+        );
+      });
+
+    /* =======================================================
+       ACTIVITIES
+       Final result + ranking + click/tap for answer details.
+    ======================================================== */
+    state.activityResults
+      .slice()
+      .sort(function(a,b){
+        return timestampValue(b.createdAt || b.updatedAt) -
+               timestampValue(a.createdAt || a.updatedAt);
+      })
+      .forEach(function(item){
+        var activityScore =
+          item.score != null ? item.score : item.totalCorrectAnswers;
+
+        var activityTotal =
+          item.total != null ? item.total : item.totalAnswered;
+
+        var score = formatScore(
+          activityScore,
+          activityTotal,
+          item.percent
+        );
+
+        var ranking = activityRank(item);
+        var medal =
+          ranking.rank === 1 ? "🥇" :
+          ranking.rank === 2 ? "🥈" :
+          ranking.rank === 3 ? "🥉" : "🏆";
+
+        var resultId = safe(item.id);
+
+        rows.push(
+          '<article class="prudle-feed-item result prudle-activity-result-card" ' +
+                   'role="button" tabindex="0" ' +
+                   'data-result-id="' + escHtml(resultId) + '" ' +
+                   'onclick="openPrudleActivityDetails(this.getAttribute(\'data-result-id\'))" ' +
+                   'onkeydown="if(event.key===\'Enter\' || event.key===\' \'){event.preventDefault();openPrudleActivityDetails(this.getAttribute(\'data-result-id\'));}" ' +
+                   'title="اضغط لعرض تفاصيل إجابات النشاط">' +
+            '<div class="prudle-item-top">' +
+              '<div>' +
+                '<div class="prudle-item-title">' +
+                  escHtml(item.activityTitle || item.title || "نشاط") +
+                '</div>' +
+                '<div class="prudle-item-course">' +
+                  escHtml(
+                    item.courseName ||
+                    item.participantCourseName ||
+                    item.trainingCourse ||
+                    ""
+                  ) +
+                '</div>' +
+              '</div>' +
+              '<span class="prudle-item-type">' +
+                '<i class="fa-solid fa-puzzle-piece"></i> Activity' +
+              '</span>' +
+            '</div>' +
+
+            '<div class="prudle-item-meta">' +
+              (item.group
+                ? '<span>' + escHtml(item.group) + '</span>'
+                : '') +
+              (item.trainerName
+                ? '<span>' + escHtml(item.trainerName) + '</span>'
+                : '') +
+              '<span><i class="fa-solid fa-ranking-star"></i> ترتيبك: ' +
+                medal + ' ' + escHtml(rankArabic(ranking.rank)) +
+                ' من ' + escHtml(ranking.total) +
+              '</span>' +
+            '</div>' +
+
+            '<div class="prudle-item-score">' +
+              '<div>' +
+                '<small>النتيجة النهائية</small>' +
+                '<strong>' + escHtml(score.scoreText) + '</strong>' +
+              '</div>' +
+              '<strong>' + escHtml(score.percentText) + '</strong>' +
+            '</div>' +
+
+            '<div class="prudle-item-action">' +
+              '<button type="button" class="prudle-activity-details-btn" ' +
+                      'data-result-id="' + escHtml(resultId) + '" ' +
+                      'onclick="event.stopPropagation();openPrudleActivityDetails(this.getAttribute(\'data-result-id\'))">' +
+                '<span>عرض تفاصيل الإجابات</span>' +
+                '<i class="fa-solid fa-list-check"></i>' +
+              '</button>' +
+            '</div>' +
+          '</article>'
+        );
+      });
 
     feed.innerHTML = rows.length
       ? rows.join("")
-      : `
-        <div class="prudle-empty-smart">
-          لا توجد نتائج واجبات أو كويزات أو نشاطات ضمن دوراتك المفتوحة حاليًا.
-        </div>
-      `;
+      : '<div class="prudle-empty-smart">' +
+          'لا توجد نتائج واجبات أو كويزات أو نشاطات ضمن دوراتك المفتوحة حاليًا.' +
+        '</div>';
   }
 
+  /*
+    Activity pages have used more than one saved-answer field over time.
+    Accept every known format so old and new attempts can be displayed.
+  */
   function getActivityAnswerLog(item){
-    const candidates = [
-      item && item.answerLog,
-      item && item.questionAnswers,
-      item && item.studentAnswers,
-      item && item.answersReview
+    item = item || {};
+
+    var candidates = [
+      item.answerLog,
+      item.questionAnswers,
+      item.studentAnswers,
+      item.answersReview,
+      item.answers,
+      item.answerDetails,
+      item.results
     ];
-    return candidates.find(list=>Array.isArray(list) && list.length) || [];
+
+    for(var i=0;i<candidates.length;i++){
+      if(Array.isArray(candidates[i]) && candidates[i].length){
+        return candidates[i];
+      }
+    }
+
+    /*
+      Some older activity code stores answers as an object/map:
+      {questionId:{...}, ...}
+    */
+    for(var j=0;j<candidates.length;j++){
+      var candidate = candidates[j];
+
+      if(
+        candidate &&
+        typeof candidate === "object" &&
+        !Array.isArray(candidate)
+      ){
+        var keys = Object.keys(candidate);
+        if(keys.length){
+          return keys.map(function(key){
+            var value = candidate[key];
+            if(value && typeof value === "object"){
+              return Object.assign({questionId:key},value);
+            }
+            return {
+              questionId:key,
+              studentAnswer:value
+            };
+          });
+        }
+      }
+    }
+
+    return [];
+  }
+
+  function activityAnswerCorrect(answer){
+    answer = answer || {};
+
+    if(answer.correct === true || answer.isCorrect === true){
+      return true;
+    }
+
+    if(answer.correct === false || answer.isCorrect === false){
+      return false;
+    }
+
+    var studentAnswer = safe(
+      answer.participantAnswer ||
+      answer.studentAnswer ||
+      answer.selectedAnswer ||
+      answer.selectedOption ||
+      answer.answer ||
+      answer.userAnswer ||
+      ""
+    ).toLowerCase();
+
+    var correctAnswer = safe(
+      answer.correctAnswer ||
+      answer.expectedAnswer ||
+      answer.rightAnswer ||
+      answer.answerKey ||
+      ""
+    ).toLowerCase();
+
+    if(studentAnswer && correctAnswer){
+      return studentAnswer === correctAnswer;
+    }
+
+    return null;
   }
 
   window.openPrudleActivityDetails = function(resultId){
-    const item = state.activityResults.find(row=>safe(row.id) === safe(resultId));
+    var item = null;
+
+    for(var i=0;i<state.activityResults.length;i++){
+      if(safe(state.activityResults[i].id) === safe(resultId)){
+        item = state.activityResults[i];
+        break;
+      }
+    }
+
     if(!item) return;
 
-    const score = formatScore(
-      (item.score != null ? item.score : item.totalCorrectAnswers),
-      (item.total != null ? item.total : item.totalAnswered),
+    var activityScore =
+      item.score != null ? item.score : item.totalCorrectAnswers;
+
+    var activityTotal =
+      item.total != null ? item.total : item.totalAnswered;
+
+    var score = formatScore(
+      activityScore,
+      activityTotal,
       item.percent
     );
-    const ranking = activityRank(item);
-    const answers = getActivityAnswerLog(item);
 
-    let modal = document.getElementById("prudleActivityDetailsModal");
+    var ranking = activityRank(item);
+    var answers = getActivityAnswerLog(item);
+
+    var modal =
+      document.getElementById("prudleActivityDetailsModal");
+
     if(!modal){
       modal = document.createElement("div");
       modal.id = "prudleActivityDetailsModal";
-      modal.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(10,30,52,.68);display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(5px)";
+      modal.className = "prudle-activity-modal";
+      modal.setAttribute("role","dialog");
+      modal.setAttribute("aria-modal","true");
+      modal.setAttribute("aria-label","تفاصيل إجابات النشاط");
       document.body.appendChild(modal);
     }
 
-    const answersHtml = answers.length
-      ? answers.map((answer,index)=>{
-          const question = safe(answer.question || answer.questionText || `السؤال ${index+1}`);
-          const studentAnswer = safe(answer.participantAnswer || answer.studentAnswer || answer.selectedAnswer || answer.answer || "لم تُسجل إجابة");
-          const correctAnswer = safe(answer.correctAnswer || answer.expectedAnswer || "-");
-          const correct = answer.correct === true || answer.isCorrect === true;
-          return `
-            <div style="border:1px solid #e2eaf3;border-radius:14px;padding:12px;background:${correct ? '#f3fff8' : '#fff7f7'}">
-              <div style="font-weight:900;color:#164478;margin-bottom:7px">${index+1}. ${escHtml(question)}</div>
-              <div style="font-size:12px;line-height:1.8;color:#52677d"><b>إجابة الطالب:</b> ${escHtml(studentAnswer)}</div>
-              <div style="font-size:12px;line-height:1.8;color:#52677d"><b>الإجابة الصحيحة:</b> ${escHtml(correctAnswer)}</div>
-              <div style="margin-top:7px;font-weight:900;color:${correct ? '#0f9f6e' : '#dc2626'}">${correct ? '✓ إجابة صحيحة' : '✕ إجابة غير صحيحة'}</div>
-            </div>`;
-        }).join("")
-      : `<div style="padding:22px;text-align:center;color:#71869b">لا توجد تفاصيل إجابات محفوظة لهذه المحاولة القديمة.</div>`;
+    var answerRows = [];
 
-    modal.innerHTML = `
-      <div style="width:min(760px,96vw);max-height:90vh;overflow:hidden;background:#fff;border-radius:22px;box-shadow:0 25px 70px rgba(0,0,0,.3);display:flex;flex-direction:column">
-        <div style="padding:17px 19px;background:linear-gradient(135deg,#164478,#2467a5);color:#fff;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
-          <div>
-            <div style="font-size:19px;font-weight:900">${escHtml(item.activityTitle || 'تفاصيل النشاط')}</div>
-            <div style="font-size:12px;opacity:.9;margin-top:4px">النتيجة النهائية: ${escHtml(score.scoreText)} (${escHtml(score.percentText)}) • ترتيبك: ${rankArabic(ranking.rank)} من ${ranking.total}</div>
-          </div>
-          <button type="button" onclick="closePrudleActivityDetails()" style="border:0;border-radius:10px;width:38px;height:38px;background:rgba(255,255,255,.16);color:#fff;font-size:20px;cursor:pointer">×</button>
-        </div>
-        <div style="padding:16px;overflow:auto;display:grid;gap:10px">${answersHtml}</div>
-      </div>`;
+    answers.forEach(function(answer,index){
+      answer = answer || {};
+
+      var question = safe(
+        answer.question ||
+        answer.questionText ||
+        answer.q ||
+        answer.title ||
+        ("السؤال " + (index + 1))
+      );
+
+      var studentAnswer = safe(
+        answer.participantAnswer ||
+        answer.studentAnswer ||
+        answer.selectedAnswer ||
+        answer.selectedOption ||
+        answer.answer ||
+        answer.userAnswer ||
+        "لم تُسجل إجابة"
+      );
+
+      var correctAnswer = safe(
+        answer.correctAnswer ||
+        answer.expectedAnswer ||
+        answer.rightAnswer ||
+        answer.answerKey ||
+        "-"
+      );
+
+      var correct = activityAnswerCorrect(answer);
+      var stateText =
+        correct === true
+          ? "✓ إجابة صحيحة"
+          : correct === false
+            ? "✕ إجابة غير صحيحة"
+            : "تفاصيل الإجابة";
+
+      var stateClass =
+        correct === true
+          ? "correct"
+          : correct === false
+            ? "wrong"
+            : "neutral";
+
+      answerRows.push(
+        '<div class="prudle-answer-detail ' + stateClass + '">' +
+          '<div class="prudle-answer-question">' +
+            (index + 1) + '. ' + escHtml(question) +
+          '</div>' +
+          '<div class="prudle-answer-line">' +
+            '<b>إجابة الطالب:</b> ' + escHtml(studentAnswer) +
+          '</div>' +
+          '<div class="prudle-answer-line">' +
+            '<b>الإجابة الصحيحة:</b> ' + escHtml(correctAnswer) +
+          '</div>' +
+          '<div class="prudle-answer-status">' +
+            escHtml(stateText) +
+          '</div>' +
+        '</div>'
+      );
+    });
+
+    var answersHtml = answerRows.length
+      ? answerRows.join("")
+      : '<div class="prudle-activity-no-answers">' +
+          'لا توجد تفاصيل إجابات محفوظة لهذه المحاولة القديمة.' +
+        '</div>';
+
+    modal.innerHTML =
+      '<div class="prudle-activity-modal-card">' +
+        '<div class="prudle-activity-modal-head">' +
+          '<div>' +
+            '<div class="prudle-activity-modal-title">' +
+              escHtml(item.activityTitle || item.title || "تفاصيل النشاط") +
+            '</div>' +
+            '<div class="prudle-activity-modal-summary">' +
+              'النتيجة النهائية: ' +
+              escHtml(score.scoreText) +
+              ' (' + escHtml(score.percentText) + ')' +
+              ' • ترتيبك: ' +
+              escHtml(rankArabic(ranking.rank)) +
+              ' من ' +
+              escHtml(ranking.total) +
+            '</div>' +
+          '</div>' +
+          '<button type="button" class="prudle-activity-modal-close" ' +
+                  'onclick="closePrudleActivityDetails()" ' +
+                  'aria-label="إغلاق">×</button>' +
+        '</div>' +
+        '<div class="prudle-activity-modal-body">' +
+          answersHtml +
+        '</div>' +
+      '</div>';
+
     modal.style.display = "flex";
-    modal.onclick = event=>{ if(event.target === modal) closePrudleActivityDetails(); };
+    document.documentElement.classList.add("prudle-modal-open");
+
+    modal.onclick = function(event){
+      if(event.target === modal){
+        closePrudleActivityDetails();
+      }
+    };
   };
 
   window.closePrudleActivityDetails = function(){
-    const modal = document.getElementById("prudleActivityDetailsModal");
-    if(modal) modal.style.display = "none";
+    var modal =
+      document.getElementById("prudleActivityDetailsModal");
+
+    if(modal){
+      modal.style.display = "none";
+    }
+
+    document.documentElement.classList.remove("prudle-modal-open");
   };
 
   function renderCounters(){
@@ -3336,25 +3286,15 @@ td.score{font-weight:900;direction:ltr}
 
   async function refreshNonRealtimeData(){
     /*
-      Cross-browser independent loading.
-      A failure in one source must never hide the other source.
+      Results are rendered even if one source fails.
+      This is important on mobile and on restrictive Firestore reads.
     */
-    function settle(promise){
-      return Promise.resolve(promise)
-        .then(function(value){
-          return {status:"fulfilled",value:value};
-        })
-        .catch(function(reason){
-          return {status:"rejected",reason:reason};
-        });
-    }
-
-    var tasks = await Promise.all([
-      settle(loadHomeworkState()),
-      settle(loadActivityHistory())
+    const tasks = await Promise.allSettled([
+      loadHomeworkState(),
+      loadActivityHistory()
     ]);
 
-    tasks.forEach(function(result,index){
+    tasks.forEach((result,index)=>{
       if(result.status === "rejected"){
         console.warn(
           index === 0 ? "Homework results load:" : "Activity results load:",
@@ -3367,17 +3307,18 @@ td.score{font-weight:900;direction:ltr}
     maybeToastNewItems();
   }
 
-  window.openPrudleStudentCenter = function(tab){
-    tab = tab || "notifications";
-
+  window.openPrudleStudentCenter = function(tab="notifications"){
+    /*
+      IMPORTANT:
+      Opening notifications must NEVER log the student out.
+      On mobile/desktop the click can happen before Firebase boot completes.
+    */
     if(!state.studentKey){
       state.studentKey = getStudentKey();
     }
 
-    const panel =
-      document.getElementById("prudleStudentCenterPanel");
-    const backdrop =
-      document.getElementById("prudleStudentCenterBackdrop");
+    const panel = document.getElementById("prudleStudentCenterPanel");
+    const backdrop = document.getElementById("prudleStudentCenterBackdrop");
 
     if(panel){
       panel.classList.add("open");
@@ -3389,38 +3330,44 @@ td.score{font-weight:900;direction:ltr}
 
     switchPrudleStudentTab(tab);
 
-    /*
-      Every click performs a fresh load. This prevents a stale/empty state
-      restored by Safari or a mobile browser from remaining on screen.
-    */
-    loadStudentContext()
-      .then(function(ok){
-        if(!ok){
-          throw new Error("Student context not found");
-        }
-        return refreshNonRealtimeData();
-      })
-      .then(function(){
-        renderAll();
-        listenIndividualSessions();
-      })
-      .catch(function(error){
-        console.warn("Center refresh:",error);
+    /* If context was not ready yet, load it now without leaving the page. */
+    if(state.studentKey && !state.studentDocs.length){
+      loadStudentContext()
+        .then(function(ok){
+          if(!ok) return;
+          return refreshNonRealtimeData();
+        })
+        .then(function(){
+          renderAll();
+        })
+        .catch(function(error){
+          console.warn("Notification center lazy load:",error);
+          const feed = document.getElementById(
+            tab === "history" ? "prudleHistoryFeed" : "prudleNotificationFeed"
+          );
+          if(feed){
+            feed.innerHTML = `
+              <div class="prudle-empty-smart">
+                تعذر تحميل البيانات مؤقتًا. اضغط على الإشعارات مرة أخرى بعد لحظات.
+              </div>
+            `;
+          }
+        });
+    }
 
-        const message = `
-          <div class="prudle-empty-smart">
-            تعذر تحميل البيانات الآن. تأكد من تسجيل دخول الطالب ثم أعد فتح الإشعارات.
-          </div>
-        `;
-
-        const feed = document.getElementById(
-          tab === "history"
-            ? "prudleHistoryFeed"
-            : "prudleNotificationFeed"
-        );
-
-        if(feed) feed.innerHTML = message;
-      });
+    /* No student key: show a message, do not redirect or clear login. */
+    if(!state.studentKey){
+      const message = `
+        <div class="prudle-empty-smart">
+          لم يتم العثور على رقم الطالب في هذه الصفحة.<br>
+          ارجع إلى بوابة الطالب ثم افتح الإشعارات مرة أخرى.
+        </div>
+      `;
+      const nf = document.getElementById("prudleNotificationFeed");
+      const hf = document.getElementById("prudleHistoryFeed");
+      if(nf) nf.innerHTML = message;
+      if(hf) hf.innerHTML = message;
+    }
   };
 
   window.closePrudleStudentCenter = function(){
@@ -3450,62 +3397,14 @@ td.score{font-weight:900;direction:ltr}
 
   window.prudleStudentLogout = function(){
     try{
-      if(state.individualUnsubscribe){
-        state.individualUnsubscribe();
-        state.individualUnsubscribe = null;
-      }
-      if(state.refreshTimer){
-        clearInterval(state.refreshTimer);
-        state.refreshTimer = null;
-      }
-      if(state.individualPollTimer){
-        clearInterval(state.individualPollTimer);
-        state.individualPollTimer = null;
-      }
-    }catch(error){}
-
-    var keys = [
-      "studentID",
-      "student_iqama",
-      "studentLoginDate",
-      "studentName",
-      "username",
-      "role",
-      "loginDate"
-    ];
-
-    try{
-      keys.forEach(function(key){ localStorage.removeItem(key); });
+      localStorage.removeItem("studentID");
+      localStorage.removeItem("student_iqama");
+      localStorage.removeItem("studentLoginDate");
       localStorage.setItem("studentLoggedOut","1");
-    }catch(error){}
-
-    try{
-      keys.forEach(function(key){ sessionStorage.removeItem(key); });
-      sessionStorage.setItem("studentLoggedOut","1");
-    }catch(error){}
-
-    try{
-      document.cookie =
-        "prudleStudentID=; path=/; max-age=0; SameSite=Lax; Secure";
-    }catch(error){}
-
-    window.__prudleStudentID = "";
-
-    state.studentKey = "";
-    state.studentName = "";
-    state.studentDocs = [];
-    state.courseIds = new Set();
-    state.openCourseIds = new Set();
-    state.openCourses = new Map();
-    state.openIndividual = [];
-    state.openHomework = [];
-    state.homeworkResults = [];
-    state.activityResults = [];
-    state.allActivityResults = [];
-
-    window.location.replace(
-      "https://www.prudle-education.com/log-in-out?logout=1&t=" + Date.now()
-    );
+    }catch(error){
+      console.warn(error);
+    }
+    location.href = "https://www.prudle-education.com/log-in-out";
   };
 
   window.goActivities = function(){
@@ -3526,7 +3425,7 @@ td.score{font-weight:900;direction:ltr}
       if(!ok){
         const msg = `
           <div class="prudle-empty-smart">
-            تعذر تحميل بيانات الطالب. إذا كنت تستخدم Safari، حدّث الصفحة مرة واحدة بعد تسجيل الدخول.
+            تعذر تحميل بيانات الطالب في هذه الصفحة.
           </div>
         `;
         const nf = document.getElementById("prudleNotificationFeed");
@@ -3541,7 +3440,7 @@ td.score{font-weight:900;direction:ltr}
 
       state.refreshTimer = setInterval(
         refreshNonRealtimeData,
-        30000
+        60000
       );
     }catch(error){
       console.error("Unable to start student notifications:",error);
@@ -3574,43 +3473,22 @@ td.score{font-weight:900;direction:ltr}
 
   window.addEventListener("load",startPrudleBoot,{once:true});
 
-  /*
-    All browsers can restore tabs/pages from memory.
-    Refresh the Prudle student data whenever the page becomes active.
-  */
-  window.addEventListener("pageshow",function(){
-    state.studentKey = getStudentKey();
-    if(!state.studentKey) return;
-
-    setTimeout(function(){
-      loadStudentContext()
-        .then(function(ok){
-          if(!ok) return;
-          return refreshNonRealtimeData();
-        })
-        .then(function(){
-          renderAll();
-          listenIndividualSessions();
-        })
-        .catch(function(error){
-          console.warn("pageshow refresh:",error);
-        });
-    },100);
-  });
-
-  document.addEventListener("visibilitychange",function(){
-    if(document.visibilityState !== "visible") return;
-
-    state.studentKey = getStudentKey();
-    if(!state.studentKey) return;
-
-    refreshNonRealtimeData()
-      .then(function(){
-        renderAll();
-      })
-      .catch(function(error){
-        console.warn("visibility refresh:",error);
-      });
+  /* Safari/Chrome mobile can restore the page from back-forward cache. */
+  window.addEventListener("pageshow",function(event){
+    if(event && event.persisted){
+      state.studentKey = getStudentKey();
+      if(state.studentKey){
+        loadStudentContext()
+          .then(function(ok){
+            if(!ok) return;
+            return refreshNonRealtimeData();
+          })
+          .then(function(){ renderAll(); })
+          .catch(function(error){
+            console.warn("BFCache student refresh:",error);
+          });
+      }
+    }
   });
 })();
 </script>
