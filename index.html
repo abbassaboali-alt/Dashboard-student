@@ -1146,6 +1146,43 @@
   }
 </style>
 
+
+<style id="prudle-all-browser-compatibility">
+  /* Universal mobile viewport fallback */
+  #prudleStudentCenterPanel{
+    height:100vh !important;
+    min-height:100vh !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  @supports (height:100dvh){
+    #prudleStudentCenterPanel{
+      height:100dvh !important;
+      min-height:100dvh !important;
+    }
+  }
+
+  @supports not (backdrop-filter: blur(1px)){
+    .portal-wrap{
+      background:#ffffff;
+    }
+  }
+
+  button,
+  a{
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  @media(max-width:760px){
+    #prudleStudentCenterPanel{
+      width:100% !important;
+      max-width:100% !important;
+      left:0 !important;
+    }
+  }
+</style>
+
 </head>
 <body>
 
@@ -1491,144 +1528,53 @@
 <script>
 (function(){
 
-  function readCookie(name){
-    try{
-      const parts = document.cookie ? document.cookie.split(";") : [];
-      for(let i=0;i<parts.length;i++){
-        const pair = parts[i].trim().split("=");
-        const key = decodeURIComponent(pair.shift() || "");
-        if(key === name){
-          return decodeURIComponent(pair.join("=") || "");
-        }
-      }
-    }catch(error){
-      console.warn("Cookie read:",error);
-    }
-    return "";
-  }
+  const params = new URLSearchParams(window.location.search);
 
-  function writeStudentCookie(value){
-    if(!value) return;
-    try{
-      document.cookie =
-        "prudleStudentID=" + encodeURIComponent(value) +
-        "; path=/; max-age=2592000; SameSite=Lax; Secure";
-    }catch(error){
-      console.warn("Cookie save:",error);
-    }
-  }
+  const sidFromUrl =
+    params.get("studentID") ||
+    params.get("student_iqama") ||
+    "";
 
-  function safeStorageGet(storage,key){
-    try{
-      return storage.getItem(key) || "";
-    }catch(error){
-      return "";
-    }
-  }
-
-  function getHashParams(){
-    try{
-      const raw = String(location.hash || "").replace(/^#/,"");
-      return new URLSearchParams(raw);
-    }catch(error){
-      return new URLSearchParams("");
-    }
-  }
-
-  function resolveStudentID(){
-    const params = new URLSearchParams(window.location.search);
-    const hashParams = getHashParams();
-
-    const fromUrl =
-      params.get("studentID") ||
-      params.get("student_iqama") ||
-      params.get("iqama") ||
-      hashParams.get("studentID") ||
-      hashParams.get("student_iqama") ||
-      hashParams.get("iqama") ||
+  let sidFromStorage = "";
+  try{
+    sidFromStorage =
+      localStorage.getItem("studentID") ||
+      localStorage.getItem("student_iqama") ||
+      sessionStorage.getItem("studentID") ||
+      sessionStorage.getItem("student_iqama") ||
       "";
-
-    const directStorage =
-      safeStorageGet(localStorage,"studentID") ||
-      safeStorageGet(localStorage,"student_iqama") ||
-      safeStorageGet(sessionStorage,"studentID") ||
-      safeStorageGet(sessionStorage,"student_iqama") ||
-      "";
-
-    /*
-      Important Safari fallback:
-      Prudle login pages may retain the student login in username/role
-      while a fresh Safari origin has no studentID key yet.
-    */
-    const role = String(
-      safeStorageGet(localStorage,"role") ||
-      safeStorageGet(sessionStorage,"role") ||
-      ""
-    ).toLowerCase();
-
-    const username =
-      safeStorageGet(localStorage,"username") ||
-      safeStorageGet(sessionStorage,"username") ||
-      "";
-
-    const usernameLooksStudent =
-      !role ||
-      role.includes("student") ||
-      role.includes("طالب") ||
-      /^\d{4,}$/.test(String(username).trim());
-
-    const fromUsername =
-      usernameLooksStudent ? username : "";
-
-    const fromCookie = readCookie("prudleStudentID");
-
-    return String(
-      fromUrl ||
-      directStorage ||
-      fromUsername ||
-      fromCookie ||
-      ""
-    ).trim();
+  }catch(error){
+    console.warn("Student storage read:",error);
   }
 
-  const studentID = resolveStudentID();
+  const studentID = String(sidFromUrl || sidFromStorage).trim();
 
-  /*
-    Keep a page-memory copy. This is especially useful in iPhone Safari
-    if storage access changes after the page has already loaded.
-  */
+  /* Keep an in-memory copy so notification clicks never depend only on storage. */
   window.__prudleStudentID = studentID;
-  window.__prudleResolveStudentID = resolveStudentID;
 
   if(studentID){
     try{
       localStorage.removeItem("studentLoggedOut");
-      localStorage.setItem("studentID",studentID);
-      localStorage.setItem("student_iqama",studentID);
-      localStorage.setItem("studentLoginDate",new Date().toDateString());
+      localStorage.setItem("studentID", studentID);
+      localStorage.setItem("student_iqama", studentID);
+      localStorage.setItem("studentLoginDate", new Date().toDateString());
+      sessionStorage.setItem("studentID", studentID);
+      sessionStorage.setItem("student_iqama", studentID);
     }catch(error){
-      console.warn("Local student save:",error);
+      console.warn("Student storage save:",error);
     }
-
-    try{
-      sessionStorage.removeItem("studentLoggedOut");
-      sessionStorage.setItem("studentID",studentID);
-      sessionStorage.setItem("student_iqama",studentID);
-      sessionStorage.setItem("studentLoginDate",new Date().toDateString());
-    }catch(error){
-      console.warn("Session student save:",error);
-    }
-
-    writeStudentCookie(studentID);
   }
 
   window.goHomework = function(){
     const id = String(
-      (window.__prudleResolveStudentID && window.__prudleResolveStudentID()) ||
-      window.__prudleStudentID ||
+      localStorage.getItem("studentID") ||
+      localStorage.getItem("student_iqama") ||
+      studentID ||
       ""
     ).trim();
 
+    // لا نسجل خروج الطالب إذا لم نجد الرقم في هذه الصفحة.
+    // نفتح صفحة الواجبات مباشرة، وإذا كان الرقم متاحًا نمرره معها.
     const baseUrl = "https://www.prudle-education.com/homework-students";
     location.href = id
       ? baseUrl + "?studentID=" + encodeURIComponent(id)
@@ -1655,7 +1601,28 @@
     firebase.initializeApp(FIREBASE_CONFIG);
   }
 
+  /*
+    Cross-browser Firestore transport.
+    Safari/iOS can occasionally fail with the default WebChannel transport,
+    so use long-polling there while keeping normal transport elsewhere.
+  */
+  var isSafariBrowser = (function(){
+    var ua = navigator.userAgent || "";
+    return /Safari/i.test(ua) &&
+           !/Chrome|CriOS|Chromium|Edg|OPR|FxiOS/i.test(ua);
+  })();
+
   const db = firebase.firestore();
+
+  if(isSafariBrowser){
+    try{
+      db.settings({
+        experimentalForceLongPolling:true
+      });
+    }catch(error){
+      console.warn("Safari Firestore transport fallback:",error);
+    }
+  }
 
   const state = {
     studentKey:"",
@@ -1675,7 +1642,7 @@
     refreshTimer:null
   };
 
-  const safe = value => String(value ?? "").trim();
+  const safe = value => String(value == null ? "" : value).trim();
   const escHtml = value => safe(value)
     .replace(/&/g,"&amp;")
     .replace(/</g,"&lt;")
@@ -1684,24 +1651,39 @@
     .replace(/'/g,"&#039;");
 
   function getStudentKey(){
-    let key = "";
-
-    /*
-      Use the shared Safari-safe resolver first.
-      It checks URL, hash, localStorage, sessionStorage, username/role,
-      cookie, and the in-memory student ID.
-    */
+    var params;
     try{
-      if(window.__prudleResolveStudentID){
-        key = safe(window.__prudleResolveStudentID());
-      }
+      params = new URLSearchParams(location.search);
     }catch(error){
-      console.warn("Shared student resolver:",error);
+      params = { get:function(){ return ""; } };
     }
 
-    if(!key){
-      key = safe(window.__prudleStudentID || "");
+    var stored = "";
+    try{
+      stored =
+        localStorage.getItem("studentID") ||
+        localStorage.getItem("student_iqama") ||
+        sessionStorage.getItem("studentID") ||
+        sessionStorage.getItem("student_iqama") ||
+        "";
+    }catch(error){
+      console.warn("Student storage access:",error);
     }
+
+    var cookieID = "";
+    try{
+      var match = document.cookie.match(/(?:^|;\s*)prudleStudentID=([^;]+)/);
+      cookieID = match ? decodeURIComponent(match[1]) : "";
+    }catch(error){}
+
+    var key = safe(
+      params.get("studentID") ||
+      params.get("student_iqama") ||
+      window.__prudleStudentID ||
+      stored ||
+      cookieID ||
+      ""
+    );
 
     if(key){
       window.__prudleStudentID = key;
@@ -1714,6 +1696,12 @@
       try{
         sessionStorage.setItem("studentID",key);
         sessionStorage.setItem("student_iqama",key);
+      }catch(error){}
+
+      try{
+        document.cookie =
+          "prudleStudentID=" + encodeURIComponent(key) +
+          "; path=/; max-age=2592000; SameSite=Lax; Secure";
       }catch(error){}
     }
 
@@ -1729,20 +1717,20 @@
   }
 
   function isHomeworkExam(exam){
-    const skill = safe(exam?.examSkill).toLowerCase();
+    const skill = safe(exam && exam.examSkill).toLowerCase();
 
     if(skill === "homework"){
       return true;
     }
 
-    if(exam?.isHomework === true){
+    if(exam && exam.isHomework === true){
       return true;
     }
 
     const category = safe(
-      exam?.examCategory ||
-      exam?.examType ||
-      exam?.category
+      (exam && exam.examCategory) ||
+      (exam && exam.examType) ||
+      (exam && exam.category)
     ).toLowerCase();
 
     return category === "homework";
@@ -1750,18 +1738,18 @@
 
   function isQuizExam(exam){
     const category = safe(
-      exam?.examCategory ||
-      exam?.examType ||
-      exam?.category ||
-      exam?.type ||
+      (exam && exam.examCategory) ||
+      (exam && exam.examType) ||
+      (exam && exam.category) ||
+      (exam && exam.type) ||
       ""
     ).toLowerCase();
 
-    const skill = safe(exam?.examSkill || "").toLowerCase();
+    const skill = safe((exam && exam.examSkill) || "").toLowerCase();
     const title = safe(
-      exam?.title ||
-      exam?.examTitle ||
-      exam?.name ||
+      (exam && exam.title) ||
+      (exam && exam.examTitle) ||
+      (exam && exam.name) ||
       ""
     ).toLowerCase();
 
@@ -1783,14 +1771,14 @@
   */
   function isHomeworkQuestion(question){
     const skill = safe(
-      question?.skill ||
-      question?.examSkill ||
+      (question && question.skill) ||
+      (question && question.examSkill) ||
       ""
     ).toLowerCase();
 
     const group = safe(
-      question?.group ||
-      question?.category ||
+      (question && question.group) ||
+      (question && question.category) ||
       ""
     ).toLowerCase();
 
@@ -1803,7 +1791,7 @@
 
   function visibleQuestionIds(exam,courseId){
     const map =
-      exam?.visibleQuestionsByCourse &&
+      (exam && exam.visibleQuestionsByCourse) &&
       typeof exam.visibleQuestionsByCourse === "object"
         ? exam.visibleQuestionsByCourse
         : {};
@@ -1838,15 +1826,6 @@
   async function loadStudentContext(){
     state.studentKey = getStudentKey();
 
-    /*
-      Safari can finish restoring storage a fraction later after navigation.
-      Resolve once more before giving up.
-    */
-    if(!state.studentKey){
-      await new Promise(function(resolve){ setTimeout(resolve,180); });
-      state.studentKey = getStudentKey();
-    }
-
     if(!state.studentKey){
       return false;
     }
@@ -1866,7 +1845,7 @@
     }
 
     state.studentName =
-      safe(state.studentDocs[0]?.name) ||
+      safe(state.studentDocs[0] && state.studentDocs[0].name) ||
       "Student";
 
     state.courseIds = new Set(
@@ -1896,9 +1875,8 @@
       document.getElementById("prudleStudentSmartTools");
     if(smartTools) smartTools.style.display = "grid";
 
-    document
-      .getElementById("prudleStudentNotificationFab")
-      ?.classList.add("show");
+    var oldFab = document.getElementById("prudleStudentNotificationFab");
+    if(oldFab) oldFab.classList.add("show");
 
     const centerName =
       document.getElementById("prudleStudentCenterName");
@@ -2124,28 +2102,28 @@
 
   function activityCourseId(item){
     return safe(
-      item?.courseId ||
-      item?.participantCourseId ||
-      item?.sourceCourseId
+      (item && item.courseId) ||
+      (item && item.participantCourseId) ||
+      (item && item.sourceCourseId)
     );
   }
 
   function activityIdentity(item){
-    const activityId = safe(item?.activityId || item?.sourceActivityId);
+    const activityId = safe((item && item.activityId) || (item && item.sourceActivityId));
     const courseId = activityCourseId(item);
-    const title = safe(item?.activityTitle || item?.title);
+    const title = safe((item && item.activityTitle) || (item && item.title));
     return `${activityId || title}__${courseId}`;
   }
 
   function hasSolvedActivity(session){
-    const sessionActivityId = safe(session?.activityId || session?.sourceActivityId);
+    const sessionActivityId = safe((session && session.activityId) || (session && session.sourceActivityId));
     const sessionCourseId = activityCourseId(session);
-    const sessionTitle = safe(session?.activityTitle || session?.title);
+    const sessionTitle = safe((session && session.activityTitle) || (session && session.title));
 
     return state.activityResults.some(result=>{
-      const resultActivityId = safe(result?.activityId || result?.sourceActivityId);
+      const resultActivityId = safe((result && result.activityId) || (result && result.sourceActivityId));
       const resultCourseId = activityCourseId(result);
-      const resultTitle = safe(result?.activityTitle || result?.title);
+      const resultTitle = safe((result && result.activityTitle) || (result && result.title));
 
       const sameActivity = sessionActivityId && resultActivityId
         ? sessionActivityId === resultActivityId
@@ -2156,17 +2134,17 @@
   }
 
   function activityScoreValue(item){
-    const value = Number(item?.score ?? item?.totalCorrectAnswers ?? 0);
+    const value = Number(((item && item.score) != null ? item.score : (((item && item.totalCorrectAnswers) != null) ? item.totalCorrectAnswers : 0)));
     return Number.isFinite(value) ? value : 0;
   }
 
   function activityRank(item){
     const key = activityIdentity(item);
-    const currentParticipant = safe(item?.participantId || state.studentKey);
+    const currentParticipant = safe((item && item.participantId) || state.studentKey);
 
     const sameCompetition = state.allActivityResults.filter(row=>
       activityIdentity(row) === key &&
-      safe(row?.participantId)
+      safe(row && row.participantId)
     );
 
     // نحتفظ بأفضل محاولة لكل طالب حتى لا تتكرر نفس هوية الطالب في الترتيب.
@@ -2455,8 +2433,8 @@
     state.activityResults.forEach(item=>{
       const score =
         formatScore(
-          item.score ?? item.totalCorrectAnswers,
-          item.total ?? item.totalAnswered,
+          (item.score != null ? item.score : item.totalCorrectAnswers),
+          (item.total != null ? item.total : item.totalAnswered),
           item.percent
         );
       const ranking = activityRank(item);
@@ -2516,10 +2494,10 @@
 
   function getActivityAnswerLog(item){
     const candidates = [
-      item?.answerLog,
-      item?.questionAnswers,
-      item?.studentAnswers,
-      item?.answersReview
+      item && item.answerLog,
+      item && item.questionAnswers,
+      item && item.studentAnswers,
+      item && item.answersReview
     ];
     return candidates.find(list=>Array.isArray(list) && list.length) || [];
   }
@@ -2529,8 +2507,8 @@
     if(!item) return;
 
     const score = formatScore(
-      item.score ?? item.totalCorrectAnswers,
-      item.total ?? item.totalAnswered,
+      (item.score != null ? item.score : item.totalCorrectAnswers),
+      (item.total != null ? item.total : item.totalAnswered),
       item.percent
     );
     const ranking = activityRank(item);
@@ -2695,8 +2673,8 @@
 
     activityRows.forEach(item=>{
       const score = formatScore(
-        item.score ?? item.totalCorrectAnswers,
-        item.total ?? item.totalAnswered,
+        (item.score != null ? item.score : item.totalCorrectAnswers),
+        (item.total != null ? item.total : item.totalAnswered),
         item.percent
       );
 
@@ -2950,15 +2928,25 @@ td.score{font-weight:900;direction:ltr}
 
   async function refreshNonRealtimeData(){
     /*
-      Results are rendered even if one source fails.
-      This is important on mobile and on restrictive Firestore reads.
+      Cross-browser independent loading.
+      A failure in one source must never hide the other source.
     */
-    const tasks = await Promise.allSettled([
-      loadHomeworkState(),
-      loadActivityHistory()
+    function settle(promise){
+      return Promise.resolve(promise)
+        .then(function(value){
+          return {status:"fulfilled",value:value};
+        })
+        .catch(function(reason){
+          return {status:"rejected",reason:reason};
+        });
+    }
+
+    var tasks = await Promise.all([
+      settle(loadHomeworkState()),
+      settle(loadActivityHistory())
     ]);
 
-    tasks.forEach((result,index)=>{
+    tasks.forEach(function(result,index){
       if(result.status === "rejected"){
         console.warn(
           index === 0 ? "Homework results load:" : "Activity results load:",
@@ -3069,11 +3057,9 @@ td.score{font-weight:900;direction:ltr}
         clearInterval(state.refreshTimer);
         state.refreshTimer = null;
       }
-    }catch(error){
-      console.warn("Listener cleanup:",error);
-    }
+    }catch(error){}
 
-    const keys = [
+    var keys = [
       "studentID",
       "student_iqama",
       "studentLoginDate",
@@ -3084,29 +3070,19 @@ td.score{font-weight:900;direction:ltr}
     ];
 
     try{
-      keys.forEach(function(key){
-        localStorage.removeItem(key);
-      });
+      keys.forEach(function(key){ localStorage.removeItem(key); });
       localStorage.setItem("studentLoggedOut","1");
-    }catch(error){
-      console.warn("Local logout:",error);
-    }
+    }catch(error){}
 
     try{
-      keys.forEach(function(key){
-        sessionStorage.removeItem(key);
-      });
+      keys.forEach(function(key){ sessionStorage.removeItem(key); });
       sessionStorage.setItem("studentLoggedOut","1");
-    }catch(error){
-      console.warn("Session logout:",error);
-    }
+    }catch(error){}
 
     try{
       document.cookie =
         "prudleStudentID=; path=/; max-age=0; SameSite=Lax; Secure";
-    }catch(error){
-      console.warn("Cookie logout:",error);
-    }
+    }catch(error){}
 
     window.__prudleStudentID = "";
 
@@ -3122,11 +3098,8 @@ td.score{font-weight:900;direction:ltr}
     state.activityResults = [];
     state.allActivityResults = [];
 
-    /*
-      replace() prevents Safari Back from restoring the authenticated portal.
-    */
     window.location.replace(
-      "https://www.prudle-education.com/log-in-out?logout=1&ts=" + Date.now()
+      "https://www.prudle-education.com/log-in-out?logout=1&t=" + Date.now()
     );
   };
 
@@ -3146,14 +3119,9 @@ td.score{font-weight:900;direction:ltr}
       const ok = await loadStudentContext();
 
       if(!ok){
-        const resolved = getStudentKey();
         const msg = `
           <div class="prudle-empty-smart">
-            ${
-              resolved
-                ? "تم التعرف على الطالب ولكن تعذر تحميل بياناته مؤقتًا. حدّث الصفحة مرة أخرى."
-                : "لم يتم العثور على رقم الطالب في جلسة Safari. سجّل الدخول مرة أخرى من صفحة دخول الطالب."
-            }
+            تعذر تحميل بيانات الطالب في هذه الصفحة.
           </div>
         `;
         const nf = document.getElementById("prudleNotificationFeed");
@@ -3201,38 +3169,21 @@ td.score{font-weight:900;direction:ltr}
 
   window.addEventListener("load",startPrudleBoot,{once:true});
 
-  /*
-    Safari-specific restore:
-    pageshow may fire after storage/cookie state is restored.
-    Re-resolve the student and refresh only when necessary.
-  */
+  /* Safari/Chrome mobile can restore the page from back-forward cache. */
   window.addEventListener("pageshow",function(event){
-    const restoredKey = getStudentKey();
-
-    if(restoredKey){
-      state.studentKey = restoredKey;
-    }
-
-    if(
-      restoredKey &&
-      (
-        (event && event.persisted) ||
-        !state.studentDocs.length ||
-        (!state.homeworkResults.length && !state.activityResults.length)
-      )
-    ){
-      loadStudentContext()
-        .then(function(ok){
-          if(!ok) return;
-          return refreshNonRealtimeData();
-        })
-        .then(function(){
-          renderAll();
-          listenIndividualSessions();
-        })
-        .catch(function(error){
-          console.warn("Safari pageshow refresh:",error);
-        });
+    if(event && event.persisted){
+      state.studentKey = getStudentKey();
+      if(state.studentKey){
+        loadStudentContext()
+          .then(function(ok){
+            if(!ok) return;
+            return refreshNonRealtimeData();
+          })
+          .then(function(){ renderAll(); })
+          .catch(function(error){
+            console.warn("BFCache student refresh:",error);
+          });
+      }
     }
   });
 })();
