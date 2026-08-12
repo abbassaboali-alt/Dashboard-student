@@ -1495,6 +1495,7 @@
     openHomework:[],
     homeworkResults:[],
     activityResults:[],
+    allActivityResults:[],
     examMap:new Map(),
     lastNotificationSignature:"",
     individualUnsubscribe:null,
@@ -1913,27 +1914,110 @@
       });
   }
 
+  function activityCourseId(item){
+    return safe(
+      item?.courseId ||
+      item?.participantCourseId ||
+      item?.sourceCourseId
+    );
+  }
+
+  function activityIdentity(item){
+    const activityId = safe(item?.activityId || item?.sourceActivityId);
+    const courseId = activityCourseId(item);
+    const title = safe(item?.activityTitle || item?.title);
+    return `${activityId || title}__${courseId}`;
+  }
+
+  function hasSolvedActivity(session){
+    const sessionActivityId = safe(session?.activityId || session?.sourceActivityId);
+    const sessionCourseId = activityCourseId(session);
+    const sessionTitle = safe(session?.activityTitle || session?.title);
+
+    return state.activityResults.some(result=>{
+      const resultActivityId = safe(result?.activityId || result?.sourceActivityId);
+      const resultCourseId = activityCourseId(result);
+      const resultTitle = safe(result?.activityTitle || result?.title);
+
+      const sameActivity = sessionActivityId && resultActivityId
+        ? sessionActivityId === resultActivityId
+        : Boolean(sessionTitle && resultTitle && sessionTitle === resultTitle);
+
+      return sameActivity && sessionCourseId === resultCourseId;
+    });
+  }
+
+  function activityScoreValue(item){
+    const value = Number(item?.score ?? item?.totalCorrectAnswers ?? 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function activityRank(item){
+    const key = activityIdentity(item);
+    const currentParticipant = safe(item?.participantId || state.studentKey);
+
+    const sameCompetition = state.allActivityResults.filter(row=>
+      activityIdentity(row) === key &&
+      safe(row?.participantId)
+    );
+
+    // نحتفظ بأفضل محاولة لكل طالب حتى لا تتكرر نفس هوية الطالب في الترتيب.
+    const bestByParticipant = new Map();
+    sameCompetition.forEach(row=>{
+      const participantId = safe(row.participantId);
+      const previous = bestByParticipant.get(participantId);
+      if(!previous || activityScoreValue(row) > activityScoreValue(previous)){
+        bestByParticipant.set(participantId,row);
+      }
+    });
+
+    const ranked = [...bestByParticipant.values()]
+      .sort((a,b)=>activityScoreValue(b)-activityScoreValue(a));
+
+    const current = bestByParticipant.get(currentParticipant) || item;
+    const currentScore = activityScoreValue(current);
+    const higherScores = new Set(
+      ranked
+        .map(activityScoreValue)
+        .filter(score=>score > currentScore)
+    );
+
+    return {
+      rank:higherScores.size + 1,
+      total:ranked.length || 1
+    };
+  }
+
+  function rankArabic(rank){
+    const names = {1:'الأول',2:'الثاني',3:'الثالث',4:'الرابع',5:'الخامس',6:'السادس',7:'السابع',8:'الثامن',9:'التاسع',10:'العاشر'};
+    return names[rank] || `رقم ${rank}`;
+  }
+
   async function loadActivityHistory(){
-    const rows = await readStudentActivityResults();
+    let allRows = [];
 
-    state.activityResults = rows
-      .filter(row=>{
-        const courseId =
-          safe(
-            row.courseId ||
-            row.participantCourseId ||
-            row.sourceCourseId
-          );
+    try{
+      const snap = await db.collection("FunActivityResults").get();
+      allRows = snap.docs.map(doc=>({id:doc.id,...doc.data()}));
+    }catch(error){
+      console.warn("All activity results:",error);
+      allRows = await readStudentActivityResults();
+    }
 
-        return (
-          courseId &&
-          state.openCourseIds.has(courseId)
-        );
-      })
+    state.allActivityResults = allRows.filter(row=>{
+      const courseId = activityCourseId(row);
+      return courseId && state.openCourseIds.has(courseId);
+    });
+
+    state.activityResults = state.allActivityResults
+      .filter(resultMatchesStudent)
       .sort((a,b)=>
         timestampValue(b.createdAt || b.updatedAt) -
         timestampValue(a.createdAt || a.updatedAt)
       );
+
+    // إذا حل الطالب النشاط بالفعل، يزال فورًا من قائمة الإشعارات المفتوحة.
+    state.openIndividual = state.openIndividual.filter(item=>!hasSolvedActivity(item));
   }
 
   function listenIndividualSessions(){
@@ -1951,7 +2035,8 @@
               safe(item.mode).toLowerCase() === "individual" &&
               safe(item.status).toLowerCase() === "active" &&
               item.studentVisible !== false &&
-              state.openCourseIds.has(safe(item.courseId))
+              state.openCourseIds.has(safe(item.courseId)) &&
+              !hasSolvedActivity(item)
             )
             .sort((a,b)=>
               timestampValue(b.updatedAt || b.startedAt) -
@@ -2137,9 +2222,14 @@
           item.total ?? item.totalAnswered,
           item.percent
         );
+      const ranking = activityRank(item);
+      const medal = ranking.rank === 1 ? '🥇' : ranking.rank === 2 ? '🥈' : ranking.rank === 3 ? '🥉' : '🏆';
 
       rows.push(`
-        <article class="prudle-feed-item result">
+        <article class="prudle-feed-item result"
+                 style="cursor:pointer"
+                 onclick="openPrudleActivityDetails('${escHtml(item.id)}')"
+                 title="اضغط لعرض تفاصيل إجابات النشاط">
           <div class="prudle-item-top">
             <div>
               <div class="prudle-item-title">
@@ -2158,14 +2248,21 @@
           <div class="prudle-item-meta">
             ${item.group ? `<span>${escHtml(item.group)}</span>` : ""}
             ${item.trainerName ? `<span>${escHtml(item.trainerName)}</span>` : ""}
+            <span><i class="fa-solid fa-ranking-star"></i> ترتيبك: ${medal} ${rankArabic(ranking.rank)} من ${ranking.total}</span>
           </div>
 
           <div class="prudle-item-score">
             <div>
-              <small>الدرجة</small>
+              <small>النتيجة النهائية</small>
               <strong>${escHtml(score.scoreText)}</strong>
             </div>
             <strong>${escHtml(score.percentText)}</strong>
+          </div>
+          <div class="prudle-item-action">
+            <a href="javascript:void(0)" onclick="event.stopPropagation();openPrudleActivityDetails('${escHtml(item.id)}')">
+              عرض تفاصيل الإجابات
+              <i class="fa-solid fa-list-check"></i>
+            </a>
           </div>
         </article>
       `);
@@ -2179,6 +2276,72 @@
         </div>
       `;
   }
+
+  function getActivityAnswerLog(item){
+    const candidates = [
+      item?.answerLog,
+      item?.questionAnswers,
+      item?.studentAnswers,
+      item?.answersReview
+    ];
+    return candidates.find(list=>Array.isArray(list) && list.length) || [];
+  }
+
+  window.openPrudleActivityDetails = function(resultId){
+    const item = state.activityResults.find(row=>safe(row.id) === safe(resultId));
+    if(!item) return;
+
+    const score = formatScore(
+      item.score ?? item.totalCorrectAnswers,
+      item.total ?? item.totalAnswered,
+      item.percent
+    );
+    const ranking = activityRank(item);
+    const answers = getActivityAnswerLog(item);
+
+    let modal = document.getElementById("prudleActivityDetailsModal");
+    if(!modal){
+      modal = document.createElement("div");
+      modal.id = "prudleActivityDetailsModal";
+      modal.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(10,30,52,.68);display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(5px)";
+      document.body.appendChild(modal);
+    }
+
+    const answersHtml = answers.length
+      ? answers.map((answer,index)=>{
+          const question = safe(answer.question || answer.questionText || `السؤال ${index+1}`);
+          const studentAnswer = safe(answer.participantAnswer || answer.studentAnswer || answer.selectedAnswer || answer.answer || "لم تُسجل إجابة");
+          const correctAnswer = safe(answer.correctAnswer || answer.expectedAnswer || "-");
+          const correct = answer.correct === true || answer.isCorrect === true;
+          return `
+            <div style="border:1px solid #e2eaf3;border-radius:14px;padding:12px;background:${correct ? '#f3fff8' : '#fff7f7'}">
+              <div style="font-weight:900;color:#164478;margin-bottom:7px">${index+1}. ${escHtml(question)}</div>
+              <div style="font-size:12px;line-height:1.8;color:#52677d"><b>إجابة الطالب:</b> ${escHtml(studentAnswer)}</div>
+              <div style="font-size:12px;line-height:1.8;color:#52677d"><b>الإجابة الصحيحة:</b> ${escHtml(correctAnswer)}</div>
+              <div style="margin-top:7px;font-weight:900;color:${correct ? '#0f9f6e' : '#dc2626'}">${correct ? '✓ إجابة صحيحة' : '✕ إجابة غير صحيحة'}</div>
+            </div>`;
+        }).join("")
+      : `<div style="padding:22px;text-align:center;color:#71869b">لا توجد تفاصيل إجابات محفوظة لهذه المحاولة القديمة.</div>`;
+
+    modal.innerHTML = `
+      <div style="width:min(760px,96vw);max-height:90vh;overflow:hidden;background:#fff;border-radius:22px;box-shadow:0 25px 70px rgba(0,0,0,.3);display:flex;flex-direction:column">
+        <div style="padding:17px 19px;background:linear-gradient(135deg,#164478,#2467a5);color:#fff;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div>
+            <div style="font-size:19px;font-weight:900">${escHtml(item.activityTitle || 'تفاصيل النشاط')}</div>
+            <div style="font-size:12px;opacity:.9;margin-top:4px">النتيجة النهائية: ${escHtml(score.scoreText)} (${escHtml(score.percentText)}) • ترتيبك: ${rankArabic(ranking.rank)} من ${ranking.total}</div>
+          </div>
+          <button type="button" onclick="closePrudleActivityDetails()" style="border:0;border-radius:10px;width:38px;height:38px;background:rgba(255,255,255,.16);color:#fff;font-size:20px;cursor:pointer">×</button>
+        </div>
+        <div style="padding:16px;overflow:auto;display:grid;gap:10px">${answersHtml}</div>
+      </div>`;
+    modal.style.display = "flex";
+    modal.onclick = event=>{ if(event.target === modal) closePrudleActivityDetails(); };
+  };
+
+  window.closePrudleActivityDetails = function(){
+    const modal = document.getElementById("prudleActivityDetailsModal");
+    if(modal) modal.style.display = "none";
+  };
 
   function renderCounters(){
     const individual = state.openIndividual.length;
