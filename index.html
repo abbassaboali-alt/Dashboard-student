@@ -1146,6 +1146,62 @@
   }
 </style>
 
+
+<style id="prudle-safari-compat-fix">
+  /* iPhone Safari compatibility */
+  html{
+    -webkit-text-size-adjust:100%;
+  }
+
+  button,
+  a{
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  #prudleStudentCenterPanel{
+    height:100vh !important;
+    min-height:100vh !important;
+    -webkit-overflow-scrolling:touch;
+    overflow-y:auto !important;
+    transform:translate3d(-105%,0,0);
+    -webkit-transform:translate3d(-105%,0,0);
+    will-change:transform;
+  }
+
+  #prudleStudentCenterPanel.open{
+    transform:translate3d(0,0,0) !important;
+    -webkit-transform:translate3d(0,0,0) !important;
+  }
+
+  @supports (height:100dvh){
+    #prudleStudentCenterPanel{
+      height:100dvh !important;
+      min-height:100dvh !important;
+    }
+  }
+
+  @media(max-width:760px){
+    #prudleStudentCenterPanel{
+      width:100% !important;
+      max-width:100% !important;
+      left:0 !important;
+      right:auto !important;
+    }
+
+    .prudle-center-head{
+      position:-webkit-sticky;
+      position:sticky;
+      top:0;
+    }
+
+    #prudleTopNotificationBtn,
+    .hero-action-btn{
+      cursor:pointer;
+      touch-action:manipulation;
+    }
+  }
+</style>
+
 </head>
 <body>
 
@@ -1584,7 +1640,7 @@
     refreshTimer:null
   };
 
-  const safe = value => String(value ?? "").trim();
+  const safe = value => String(value == null ? "" : value).trim();
   const escHtml = value => safe(value)
     .replace(/&/g,"&amp;")
     .replace(/</g,"&lt;")
@@ -1631,20 +1687,20 @@
   }
 
   function isHomeworkExam(exam){
-    const skill = safe(exam?.examSkill).toLowerCase();
+    const skill = safe(exam && exam.examSkill).toLowerCase();
 
     if(skill === "homework"){
       return true;
     }
 
-    if(exam?.isHomework === true){
+    if(exam && exam.isHomework === true){
       return true;
     }
 
     const category = safe(
-      exam?.examCategory ||
-      exam?.examType ||
-      exam?.category
+      (exam && exam.examCategory) ||
+      (exam && exam.examType) ||
+      (exam && exam.category)
     ).toLowerCase();
 
     return category === "homework";
@@ -1652,18 +1708,18 @@
 
   function isQuizExam(exam){
     const category = safe(
-      exam?.examCategory ||
-      exam?.examType ||
-      exam?.category ||
-      exam?.type ||
+      (exam && exam.examCategory) ||
+      (exam && exam.examType) ||
+      (exam && exam.category) ||
+      (exam && exam.type) ||
       ""
     ).toLowerCase();
 
-    const skill = safe(exam?.examSkill || "").toLowerCase();
+    const skill = safe((exam && exam.examSkill) || "").toLowerCase();
     const title = safe(
-      exam?.title ||
-      exam?.examTitle ||
-      exam?.name ||
+      (exam && exam.title) ||
+      (exam && exam.examTitle) ||
+      (exam && exam.name) ||
       ""
     ).toLowerCase();
 
@@ -1685,14 +1741,14 @@
   */
   function isHomeworkQuestion(question){
     const skill = safe(
-      question?.skill ||
-      question?.examSkill ||
+      (question && question.skill) ||
+      (question && question.examSkill) ||
       ""
     ).toLowerCase();
 
     const group = safe(
-      question?.group ||
-      question?.category ||
+      (question && question.group) ||
+      (question && question.category) ||
       ""
     ).toLowerCase();
 
@@ -1705,7 +1761,7 @@
 
   function visibleQuestionIds(exam,courseId){
     const map =
-      exam?.visibleQuestionsByCourse &&
+      (exam && exam.visibleQuestionsByCourse) &&
       typeof exam.visibleQuestionsByCourse === "object"
         ? exam.visibleQuestionsByCourse
         : {};
@@ -1759,7 +1815,7 @@
     }
 
     state.studentName =
-      safe(state.studentDocs[0]?.name) ||
+      safe(state.studentDocs[0] && state.studentDocs[0].name) ||
       "Student";
 
     state.courseIds = new Set(
@@ -1789,9 +1845,8 @@
       document.getElementById("prudleStudentSmartTools");
     if(smartTools) smartTools.style.display = "grid";
 
-    document
-      .getElementById("prudleStudentNotificationFab")
-      ?.classList.add("show");
+    const oldFab = document.getElementById("prudleStudentNotificationFab");
+    if(oldFab) oldFab.classList.add("show");
 
     const centerName =
       document.getElementById("prudleStudentCenterName");
@@ -2017,28 +2072,28 @@
 
   function activityCourseId(item){
     return safe(
-      item?.courseId ||
-      item?.participantCourseId ||
-      item?.sourceCourseId
+      (item && item.courseId) ||
+      (item && item.participantCourseId) ||
+      (item && item.sourceCourseId)
     );
   }
 
   function activityIdentity(item){
-    const activityId = safe(item?.activityId || item?.sourceActivityId);
+    const activityId = safe((item && item.activityId) || (item && item.sourceActivityId));
     const courseId = activityCourseId(item);
-    const title = safe(item?.activityTitle || item?.title);
+    const title = safe((item && item.activityTitle) || (item && item.title));
     return `${activityId || title}__${courseId}`;
   }
 
   function hasSolvedActivity(session){
-    const sessionActivityId = safe(session?.activityId || session?.sourceActivityId);
+    const sessionActivityId = safe((session && session.activityId) || (session && session.sourceActivityId));
     const sessionCourseId = activityCourseId(session);
-    const sessionTitle = safe(session?.activityTitle || session?.title);
+    const sessionTitle = safe((session && session.activityTitle) || (session && session.title));
 
     return state.activityResults.some(result=>{
-      const resultActivityId = safe(result?.activityId || result?.sourceActivityId);
+      const resultActivityId = safe((result && result.activityId) || (result && result.sourceActivityId));
       const resultCourseId = activityCourseId(result);
-      const resultTitle = safe(result?.activityTitle || result?.title);
+      const resultTitle = safe((result && result.activityTitle) || (result && result.title));
 
       const sameActivity = sessionActivityId && resultActivityId
         ? sessionActivityId === resultActivityId
@@ -2049,17 +2104,17 @@
   }
 
   function activityScoreValue(item){
-    const value = Number(item?.score ?? item?.totalCorrectAnswers ?? 0);
+    const value = Number(((item && item.score) != null ? item.score : (((item && item.totalCorrectAnswers) != null) ? item.totalCorrectAnswers : 0)));
     return Number.isFinite(value) ? value : 0;
   }
 
   function activityRank(item){
     const key = activityIdentity(item);
-    const currentParticipant = safe(item?.participantId || state.studentKey);
+    const currentParticipant = safe((item && item.participantId) || state.studentKey);
 
     const sameCompetition = state.allActivityResults.filter(row=>
       activityIdentity(row) === key &&
-      safe(row?.participantId)
+      safe(row && row.participantId)
     );
 
     // نحتفظ بأفضل محاولة لكل طالب حتى لا تتكرر نفس هوية الطالب في الترتيب.
@@ -2348,8 +2403,8 @@
     state.activityResults.forEach(item=>{
       const score =
         formatScore(
-          item.score ?? item.totalCorrectAnswers,
-          item.total ?? item.totalAnswered,
+          (item.score != null ? item.score : item.totalCorrectAnswers),
+          (item.total != null ? item.total : item.totalAnswered),
           item.percent
         );
       const ranking = activityRank(item);
@@ -2409,10 +2464,10 @@
 
   function getActivityAnswerLog(item){
     const candidates = [
-      item?.answerLog,
-      item?.questionAnswers,
-      item?.studentAnswers,
-      item?.answersReview
+      item && item.answerLog,
+      item && item.questionAnswers,
+      item && item.studentAnswers,
+      item && item.answersReview
     ];
     return candidates.find(list=>Array.isArray(list) && list.length) || [];
   }
@@ -2422,8 +2477,8 @@
     if(!item) return;
 
     const score = formatScore(
-      item.score ?? item.totalCorrectAnswers,
-      item.total ?? item.totalAnswered,
+      (item.score != null ? item.score : item.totalCorrectAnswers),
+      (item.total != null ? item.total : item.totalAnswered),
       item.percent
     );
     const ranking = activityRank(item);
@@ -2588,8 +2643,8 @@
 
     activityRows.forEach(item=>{
       const score = formatScore(
-        item.score ?? item.totalCorrectAnswers,
-        item.total ?? item.totalAnswered,
+        (item.score != null ? item.score : item.totalCorrectAnswers),
+        (item.total != null ? item.total : item.totalAnswered),
         item.percent
       );
 
@@ -2843,15 +2898,25 @@ td.score{font-weight:900;direction:ltr}
 
   async function refreshNonRealtimeData(){
     /*
-      Results are rendered even if one source fails.
-      This is important on mobile and on restrictive Firestore reads.
+      Safari-safe independent loading:
+      one failed source never prevents the other results from appearing.
     */
-    const tasks = await Promise.allSettled([
-      loadHomeworkState(),
-      loadActivityHistory()
+    const settle = function(promise){
+      return Promise.resolve(promise)
+        .then(function(value){
+          return {status:"fulfilled",value:value};
+        })
+        .catch(function(reason){
+          return {status:"rejected",reason:reason};
+        });
+    };
+
+    const tasks = await Promise.all([
+      settle(loadHomeworkState()),
+      settle(loadActivityHistory())
     ]);
 
-    tasks.forEach((result,index)=>{
+    tasks.forEach(function(result,index){
       if(result.status === "rejected"){
         console.warn(
           index === 0 ? "Homework results load:" : "Activity results load:",
@@ -2953,15 +3018,80 @@ td.score{font-weight:900;direction:ltr}
 
 
   window.prudleStudentLogout = function(){
+    /*
+      REAL LOGOUT:
+      clear every student-session copy before leaving the page.
+    */
     try{
-      localStorage.removeItem("studentID");
-      localStorage.removeItem("student_iqama");
-      localStorage.removeItem("studentLoginDate");
+      if(state.individualUnsubscribe){
+        state.individualUnsubscribe();
+        state.individualUnsubscribe = null;
+      }
+
+      if(state.refreshTimer){
+        clearInterval(state.refreshTimer);
+        state.refreshTimer = null;
+      }
+    }catch(error){
+      console.warn("Logout cleanup:",error);
+    }
+
+    try{
+      [
+        "studentID",
+        "student_iqama",
+        "studentLoginDate",
+        "studentName",
+        "username",
+        "role",
+        "loginDate"
+      ].forEach(function(key){
+        localStorage.removeItem(key);
+      });
       localStorage.setItem("studentLoggedOut","1");
     }catch(error){
-      console.warn(error);
+      console.warn("Local logout cleanup:",error);
     }
-    location.href = "https://www.prudle-education.com/log-in-out";
+
+    try{
+      [
+        "studentID",
+        "student_iqama",
+        "studentLoginDate",
+        "studentName",
+        "username",
+        "role",
+        "loginDate"
+      ].forEach(function(key){
+        sessionStorage.removeItem(key);
+      });
+      sessionStorage.setItem("studentLoggedOut","1");
+    }catch(error){
+      console.warn("Session logout cleanup:",error);
+    }
+
+    window.__prudleStudentID = "";
+    window.__prudleForceLoggedOut = true;
+
+    state.studentKey = "";
+    state.studentName = "";
+    state.studentDocs = [];
+    state.courseIds = new Set();
+    state.openCourseIds = new Set();
+    state.openCourses = new Map();
+    state.openIndividual = [];
+    state.openHomework = [];
+    state.homeworkResults = [];
+    state.activityResults = [];
+    state.allActivityResults = [];
+
+    /*
+      replace() prevents Safari Back/Forward cache from restoring
+      the logged-in portal after logout.
+    */
+    window.location.replace(
+      "https://www.prudle-education.com/log-in-out?logout=1&t=" + Date.now()
+    );
   };
 
   window.goActivities = function(){
@@ -3032,6 +3162,23 @@ td.score{font-weight:900;direction:ltr}
 
   /* Safari/Chrome mobile can restore the page from back-forward cache. */
   window.addEventListener("pageshow",function(event){
+    let loggedOut = false;
+
+    try{
+      loggedOut =
+        window.__prudleForceLoggedOut === true ||
+        localStorage.getItem("studentLoggedOut") === "1" ||
+        sessionStorage.getItem("studentLoggedOut") === "1";
+    }catch(error){
+      loggedOut = window.__prudleForceLoggedOut === true;
+    }
+
+    if(loggedOut){
+      window.__prudleStudentID = "";
+      state.studentKey = "";
+      return;
+    }
+
     if(event && event.persisted){
       state.studentKey = getStudentKey();
       if(state.studentKey){
