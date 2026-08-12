@@ -2095,30 +2095,59 @@
   }
 
   async function loadActivityHistory(){
-    let allRows = [];
+    /*
+      SAME RESULT-LOADING METHOD AS THE SECOND CODE:
+      read only this student's results first.
+      This prevents the whole results panel from staying blank if reading
+      every FunActivityResults document is slow or denied.
+    */
+    const rows = await readStudentActivityResults();
 
-    try{
-      const snap = await db.collection("FunActivityResults").get();
-      allRows = snap.docs.map(doc=>({id:doc.id,...doc.data()}));
-    }catch(error){
-      console.warn("All activity results:",error);
-      allRows = await readStudentActivityResults();
-    }
+    state.activityResults = rows
+      .filter(row=>{
+        const courseId =
+          safe(
+            row.courseId ||
+            row.participantCourseId ||
+            row.sourceCourseId
+          );
 
-    state.allActivityResults = allRows.filter(row=>{
-      const courseId = activityCourseId(row);
-      return courseId && state.openCourseIds.has(courseId);
-    });
-
-    state.activityResults = state.allActivityResults
-      .filter(resultMatchesStudent)
+        return (
+          courseId &&
+          state.openCourseIds.has(courseId)
+        );
+      })
       .sort((a,b)=>
         timestampValue(b.createdAt || b.updatedAt) -
         timestampValue(a.createdAt || a.updatedAt)
       );
 
-    // إذا حل الطالب النشاط بالفعل، يزال فورًا من قائمة الإشعارات المفتوحة.
-    state.openIndividual = state.openIndividual.filter(item=>!hasSolvedActivity(item));
+    /* Student has solved these activities, so remove them from notifications. */
+    state.openIndividual =
+      state.openIndividual.filter(item=>!hasSolvedActivity(item));
+
+    /*
+      Preserve ranking/details from the first code, but NEVER make them
+      block the student's own results.
+    */
+    state.allActivityResults = state.activityResults.slice();
+
+    setTimeout(async function(){
+      try{
+        const snap = await db.collection("FunActivityResults").get();
+        const allRows = snap.docs.map(doc=>({id:doc.id,...doc.data()}));
+
+        state.allActivityResults = allRows.filter(row=>{
+          const courseId = activityCourseId(row);
+          return courseId && state.openCourseIds.has(courseId);
+        });
+
+        renderAll();
+      }catch(error){
+        console.warn("Competition ranking background load:",error);
+        /* Keep the student's results visible even if ranking data fails. */
+      }
+    },0);
   }
 
   function listenIndividualSessions(){
@@ -2813,16 +2842,26 @@ td.score{font-weight:900;direction:ltr}
   }
 
   async function refreshNonRealtimeData(){
-    try{
-      await Promise.all([
-        loadHomeworkState(),
-        loadActivityHistory()
-      ]);
-      renderAll();
-      maybeToastNewItems();
-    }catch(error){
-      console.error("Student smart center:",error);
-    }
+    /*
+      Results are rendered even if one source fails.
+      This is important on mobile and on restrictive Firestore reads.
+    */
+    const tasks = await Promise.allSettled([
+      loadHomeworkState(),
+      loadActivityHistory()
+    ]);
+
+    tasks.forEach((result,index)=>{
+      if(result.status === "rejected"){
+        console.warn(
+          index === 0 ? "Homework results load:" : "Activity results load:",
+          result.reason
+        );
+      }
+    });
+
+    renderAll();
+    maybeToastNewItems();
   }
 
   window.openPrudleStudentCenter = function(tab="notifications"){
@@ -2941,6 +2980,15 @@ td.score{font-weight:900;direction:ltr}
       const ok = await loadStudentContext();
 
       if(!ok){
+        const msg = `
+          <div class="prudle-empty-smart">
+            تعذر تحميل بيانات الطالب في هذه الصفحة.
+          </div>
+        `;
+        const nf = document.getElementById("prudleNotificationFeed");
+        const hf = document.getElementById("prudleHistoryFeed");
+        if(nf) nf.innerHTML = msg;
+        if(hf) hf.innerHTML = msg;
         return;
       }
 
@@ -2953,6 +3001,16 @@ td.score{font-weight:900;direction:ltr}
       );
     }catch(error){
       console.error("Unable to start student notifications:",error);
+
+      const msg = `
+        <div class="prudle-empty-smart">
+          تعذر تحميل البيانات مؤقتًا. حدّث الصفحة وحاول مرة أخرى.
+        </div>
+      `;
+      const nf = document.getElementById("prudleNotificationFeed");
+      const hf = document.getElementById("prudleHistoryFeed");
+      if(nf) nf.innerHTML = msg;
+      if(hf) hf.innerHTML = msg;
     }
   }
 
