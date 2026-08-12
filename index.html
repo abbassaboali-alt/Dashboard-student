@@ -1602,10 +1602,9 @@
   }
 
   /*
-    Browser compatibility:
-    - Chrome / Edge / Firefox / Android: keep the normal Firestore SDK.
-    - Safari / iPhone: SDK reads are allowed, but every important read has
-      a Firestore REST fallback. This bypasses Safari/WebChannel problems.
+    Cross-browser Firestore transport.
+    Safari/iOS can occasionally fail with the default WebChannel transport,
+    so use long-polling there while keeping normal transport elsewhere.
   */
   var isSafariBrowser = (function(){
     var ua = navigator.userAgent || "";
@@ -1615,239 +1614,13 @@
 
   const db = firebase.firestore();
 
-  const FIRESTORE_REST_BASE =
-    "https://firestore.googleapis.com/v1/projects/" +
-    FIREBASE_CONFIG.projectId +
-    "/databases/(default)/documents";
-
-  function restDecodeValue(value){
-    if(!value || typeof value !== "object") return null;
-
-    if(Object.prototype.hasOwnProperty.call(value,"nullValue")) return null;
-    if(Object.prototype.hasOwnProperty.call(value,"stringValue")) return value.stringValue;
-    if(Object.prototype.hasOwnProperty.call(value,"booleanValue")) return !!value.booleanValue;
-    if(Object.prototype.hasOwnProperty.call(value,"integerValue")) return Number(value.integerValue);
-    if(Object.prototype.hasOwnProperty.call(value,"doubleValue")) return Number(value.doubleValue);
-    if(Object.prototype.hasOwnProperty.call(value,"timestampValue")) return value.timestampValue;
-    if(Object.prototype.hasOwnProperty.call(value,"referenceValue")) return value.referenceValue;
-    if(Object.prototype.hasOwnProperty.call(value,"bytesValue")) return value.bytesValue;
-
-    if(value.geoPointValue){
-      return {
-        latitude:Number(value.geoPointValue.latitude || 0),
-        longitude:Number(value.geoPointValue.longitude || 0)
-      };
-    }
-
-    if(value.arrayValue){
-      var values = value.arrayValue.values || [];
-      return values.map(restDecodeValue);
-    }
-
-    if(value.mapValue){
-      return restDecodeFields(value.mapValue.fields || {});
-    }
-
-    return null;
-  }
-
-  function restDecodeFields(fields){
-    var obj = {};
-    fields = fields || {};
-    Object.keys(fields).forEach(function(key){
-      obj[key] = restDecodeValue(fields[key]);
-    });
-    return obj;
-  }
-
-  function restDocObject(raw){
-    if(!raw || !raw.name) return null;
-    var parts = raw.name.split("/");
-    return {
-      id:parts[parts.length - 1],
-      data:restDecodeFields(raw.fields || {}),
-      raw:raw
-    };
-  }
-
-  async function restFetchJson(url,options){
-    var response = await fetch(url,options || {});
-    if(!response.ok){
-      var body = "";
-      try{ body = await response.text(); }catch(error){}
-      throw new Error("Firestore REST " + response.status + " " + body);
-    }
-    return response.json();
-  }
-
-  async function restGetCollection(collectionName){
-    var rows = [];
-    var pageToken = "";
-
-    do{
-      var url =
-        FIRESTORE_REST_BASE + "/" + encodeURIComponent(collectionName) +
-        "?pageSize=1000&key=" + encodeURIComponent(FIREBASE_CONFIG.apiKey);
-
-      if(pageToken){
-        url += "&pageToken=" + encodeURIComponent(pageToken);
-      }
-
-      var json = await restFetchJson(url,{
-        method:"GET",
-        cache:"no-store"
+  if(isSafariBrowser){
+    try{
+      db.settings({
+        experimentalForceLongPolling:true
       });
-
-      (json.documents || []).forEach(function(raw){
-        var doc = restDocObject(raw);
-        if(doc) rows.push(doc);
-      });
-
-      pageToken = json.nextPageToken || "";
-    }while(pageToken);
-
-    return rows;
-  }
-
-  async function restGetDocument(collectionName,docId){
-    var url =
-      FIRESTORE_REST_BASE + "/" +
-      encodeURIComponent(collectionName) + "/" +
-      encodeURIComponent(docId) +
-      "?key=" + encodeURIComponent(FIREBASE_CONFIG.apiKey);
-
-    var json = await restFetchJson(url,{
-      method:"GET",
-      cache:"no-store"
-    });
-
-    return restDocObject(json);
-  }
-
-  async function restRunEqual(collectionName,fieldName,value){
-    var url =
-      "https://firestore.googleapis.com/v1/projects/" +
-      FIREBASE_CONFIG.projectId +
-      "/databases/(default)/documents:runQuery?key=" +
-      encodeURIComponent(FIREBASE_CONFIG.apiKey);
-
-    var body = {
-      structuredQuery:{
-        from:[{collectionId:collectionName}],
-        where:{
-          fieldFilter:{
-            field:{fieldPath:fieldName},
-            op:"EQUAL",
-            value:{stringValue:String(value)}
-          }
-        }
-      }
-    };
-
-    var json = await restFetchJson(url,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(body),
-      cache:"no-store"
-    });
-
-    var rows = [];
-    (json || []).forEach(function(item){
-      if(item && item.document){
-        var doc = restDocObject(item.document);
-        if(doc) rows.push(doc);
-      }
-    });
-    return rows;
-  }
-
-  function compatSnapshotFromRows(rows){
-    return {
-      docs:(rows || []).map(function(row){
-        return {
-          id:row.id,
-          exists:true,
-          data:function(){ return row.data; }
-        };
-      })
-    };
-  }
-
-  async function compatCollectionGet(collectionName){
-    /*
-      Safari goes through REST first because this is the part that was
-      returning empty/no reports for the user. Other browsers keep SDK first.
-    */
-    if(isSafariBrowser){
-      try{
-        return compatSnapshotFromRows(
-          await restGetCollection(collectionName)
-        );
-      }catch(restError){
-        console.warn("Safari REST collection fallback:",collectionName,restError);
-        return db.collection(collectionName).get();
-      }
-    }
-
-    try{
-      return await db.collection(collectionName).get();
-    }catch(sdkError){
-      console.warn("SDK collection fallback to REST:",collectionName,sdkError);
-      return compatSnapshotFromRows(
-        await restGetCollection(collectionName)
-      );
-    }
-  }
-
-  async function compatDocumentGet(collectionName,docId){
-    if(isSafariBrowser){
-      try{
-        var row = await restGetDocument(collectionName,docId);
-        return {
-          id:row.id,
-          exists:true,
-          data:function(){ return row.data; }
-        };
-      }catch(restError){
-        console.warn("Safari REST document fallback:",collectionName,docId,restError);
-        return db.collection(collectionName).doc(docId).get();
-      }
-    }
-
-    try{
-      return await db.collection(collectionName).doc(docId).get();
-    }catch(sdkError){
-      var row2 = await restGetDocument(collectionName,docId);
-      return {
-        id:row2.id,
-        exists:true,
-        data:function(){ return row2.data; }
-      };
-    }
-  }
-
-  async function compatEqualQuery(collectionName,fieldName,value){
-    if(isSafariBrowser){
-      try{
-        return compatSnapshotFromRows(
-          await restRunEqual(collectionName,fieldName,value)
-        );
-      }catch(restError){
-        console.warn("Safari REST query fallback:",collectionName,restError);
-        return db.collection(collectionName)
-          .where(fieldName,"==",value)
-          .get();
-      }
-    }
-
-    try{
-      return await db.collection(collectionName)
-        .where(fieldName,"==",value)
-        .get();
-    }catch(sdkError){
-      return compatSnapshotFromRows(
-        await restRunEqual(collectionName,fieldName,value)
-      );
+    }catch(error){
+      console.warn("Safari Firestore transport fallback:",error);
     }
   }
 
@@ -1866,7 +1639,6 @@
     examMap:new Map(),
     lastNotificationSignature:"",
     individualUnsubscribe:null,
-    individualPollTimer:null,
     refreshTimer:null
   };
 
@@ -2058,11 +1830,10 @@
       return false;
     }
 
-    const studentSnap = await compatEqualQuery(
-      "students",
-      "iqama",
-      state.studentKey
-    );
+    const studentSnap = await db
+      .collection("students")
+      .where("iqama","==",state.studentKey)
+      .get();
 
     state.studentDocs = studentSnap.docs.map(doc=>({
       id:doc.id,
@@ -2085,7 +1856,7 @@
 
     const courseDocs = await Promise.all(
       [...state.courseIds].map(courseId=>
-        compatDocumentGet("Courses",courseId)
+        db.collection("Courses").doc(courseId).get()
       )
     );
 
@@ -2121,11 +1892,10 @@
     let docs = [];
 
     try{
-      const snap = await compatEqualQuery(
-        "results",
-        "studentIqama",
-        state.studentKey
-      );
+      const snap = await db
+        .collection("results")
+        .where("studentIqama","==",state.studentKey)
+        .get();
 
       docs = snap.docs.map(doc=>({
         id:doc.id,
@@ -2133,7 +1903,7 @@
       }));
     }catch(error){
       console.warn("Result query fallback:",error);
-      const snap = await compatCollectionGet("results");
+      const snap = await db.collection("results").get();
       docs = snap.docs
         .map(doc=>({id:doc.id,...doc.data()}))
         .filter(resultMatchesStudent);
@@ -2146,11 +1916,10 @@
     let docs = [];
 
     try{
-      const snap = await compatEqualQuery(
-        "FunActivityResults",
-        "participantId",
-        state.studentKey
-      );
+      const snap = await db
+        .collection("FunActivityResults")
+        .where("participantId","==",state.studentKey)
+        .get();
 
       docs = snap.docs.map(doc=>({
         id:doc.id,
@@ -2158,7 +1927,7 @@
       }));
     }catch(error){
       console.warn("Activity result query fallback:",error);
-      const snap = await compatCollectionGet("FunActivityResults");
+      const snap = await db.collection("FunActivityResults").get();
       docs = snap.docs
         .map(doc=>({id:doc.id,...doc.data()}))
         .filter(resultMatchesStudent);
@@ -2176,8 +1945,8 @@
     */
     const [examSnap, questionSnap, resultRows] =
       await Promise.all([
-        compatCollectionGet("exams"),
-        compatCollectionGet("questions"),
+        db.collection("exams").get(),
+        db.collection("questions").get(),
         readStudentExamResults()
       ]);
 
@@ -2450,7 +2219,7 @@
 
     setTimeout(async function(){
       try{
-        const snap = await compatCollectionGet("FunActivityResults");
+        const snap = await db.collection("FunActivityResults").get();
         const allRows = snap.docs.map(doc=>({id:doc.id,...doc.data()}));
 
         state.allActivityResults = allRows.filter(row=>{
@@ -2472,90 +2241,58 @@
       state.individualUnsubscribe = null;
     }
 
-    if(state.individualPollTimer){
-      clearInterval(state.individualPollTimer);
-      state.individualPollTimer = null;
-    }
-
-    function applyIndividualRows(rows){
-      state.openIndividual = (rows || [])
-        .filter(function(item){
-          return (
-            safe(item.mode).toLowerCase() === "individual" &&
-            safe(item.status).toLowerCase() === "active" &&
-            activityVisibleForStudent(item) &&
-            !hasSolvedActivity(item)
-          );
-        })
-        .sort(function(a,b){
-          return (
-            timestampValue(b.createdAt || b.updatedAt) -
-            timestampValue(a.createdAt || a.updatedAt)
-          );
-        });
-
-      renderAll();
-      maybeToastNewItems();
-    }
-
-    async function pollIndividualSessions(){
-      try{
-        const snap = await compatCollectionGet("FunActivityLiveSessions");
-        const rows = snap.docs.map(function(doc){
-          return Object.assign({id:doc.id},doc.data());
-        });
-        applyIndividualRows(rows);
-      }catch(error){
-        console.warn("Individual session polling:",error);
-      }
-    }
-
-    if(isSafariBrowser){
-      /*
-        Safari: avoid WebChannel onSnapshot completely.
-        REST polling is reliable and still refreshes notifications quickly.
-      */
-      pollIndividualSessions();
-      state.individualPollTimer = setInterval(
-        pollIndividualSessions,
-        15000
-      );
-
-      state.individualUnsubscribe = function(){
-        if(state.individualPollTimer){
-          clearInterval(state.individualPollTimer);
-          state.individualPollTimer = null;
-        }
-      };
-      return;
-    }
-
-    try{
-      state.individualUnsubscribe =
-        db.collection("FunActivityLiveSessions")
-          .onSnapshot(function(snapshot){
-            const rows = snapshot.docs.map(function(doc){
-              return Object.assign({id:doc.id},doc.data());
-            });
-            applyIndividualRows(rows);
-          },function(error){
-            console.warn("Individual session realtime:",error);
-            pollIndividualSessions();
-
-            state.individualPollTimer = setInterval(
-              pollIndividualSessions,
-              15000
+    state.individualUnsubscribe =
+      db.collection("FunActivityLiveSessions")
+        .onSnapshot(snapshot=>{
+          const rows = snapshot.docs
+            .map(doc=>({id:doc.id,...doc.data()}))
+            .filter(item=>
+              safe(item.mode).toLowerCase() === "individual" &&
+              safe(item.status).toLowerCase() === "active" &&
+              item.studentVisible !== false &&
+              state.openCourseIds.has(safe(item.courseId)) &&
+              !hasSolvedActivity(item)
+            )
+            .sort((a,b)=>
+              timestampValue(b.updatedAt || b.startedAt) -
+              timestampValue(a.updatedAt || a.startedAt)
             );
-          });
-    }catch(error){
-      console.warn("Individual session listener:",error);
-      pollIndividualSessions();
 
-      state.individualPollTimer = setInterval(
-        pollIndividualSessions,
-        15000
+          state.openIndividual = rows;
+          renderAll();
+          maybeToastNewItems();
+        },error=>{
+          console.warn("Individual notifications:",error);
+        });
+  }
+
+  function formatScore(score,total,percent){
+    const s = Number(score || 0);
+    const t = Number(total || 0);
+    const p = Number(percent || 0);
+
+    return {
+      scoreText: t > 0 ? `${s} / ${t}` : String(s),
+      percentText: Number.isFinite(p) ? `${Math.round(p)}%` : ""
+    };
+  }
+
+  function notificationLink(type,item){
+    const id = encodeURIComponent(state.studentKey);
+
+    if(type === "individual"){
+      return (
+        "https://www.prudle-education.com/studentss-activity" +
+        "?studentID=" + id +
+        "&activityId=" + encodeURIComponent(safe(item.activityId)) +
+        "&courseId=" + encodeURIComponent(safe(item.courseId))
       );
     }
+
+    return (
+      "https://www.prudle-education.com/homework-students" +
+      "?studentID=" + id
+    );
   }
 
   function renderNotifications(){
@@ -3320,10 +3057,6 @@ td.score{font-weight:900;direction:ltr}
         clearInterval(state.refreshTimer);
         state.refreshTimer = null;
       }
-      if(state.individualPollTimer){
-        clearInterval(state.individualPollTimer);
-        state.individualPollTimer = null;
-      }
     }catch(error){}
 
     var keys = [
@@ -3388,7 +3121,7 @@ td.score{font-weight:900;direction:ltr}
       if(!ok){
         const msg = `
           <div class="prudle-empty-smart">
-            تعذر تحميل بيانات الطالب. إذا كنت تستخدم Safari، حدّث الصفحة مرة واحدة بعد تسجيل الدخول.
+            تعذر تحميل بيانات الطالب في هذه الصفحة.
           </div>
         `;
         const nf = document.getElementById("prudleNotificationFeed");
@@ -3436,35 +3169,22 @@ td.score{font-weight:900;direction:ltr}
 
   window.addEventListener("load",startPrudleBoot,{once:true});
 
-  /*
-    Safari may restore the page without event.persisted being true.
-    Re-read identity and data once whenever Safari shows the page.
-  */
+  /* Safari/Chrome mobile can restore the page from back-forward cache. */
   window.addEventListener("pageshow",function(event){
-    if(!isSafariBrowser && !(event && event.persisted)){
-      return;
+    if(event && event.persisted){
+      state.studentKey = getStudentKey();
+      if(state.studentKey){
+        loadStudentContext()
+          .then(function(ok){
+            if(!ok) return;
+            return refreshNonRealtimeData();
+          })
+          .then(function(){ renderAll(); })
+          .catch(function(error){
+            console.warn("BFCache student refresh:",error);
+          });
+      }
     }
-
-    state.studentKey = getStudentKey();
-
-    if(!state.studentKey){
-      return;
-    }
-
-    setTimeout(function(){
-      loadStudentContext()
-        .then(function(ok){
-          if(!ok) return;
-          return refreshNonRealtimeData();
-        })
-        .then(function(){
-          renderAll();
-          listenIndividualSessions();
-        })
-        .catch(function(error){
-          console.warn("Safari pageshow refresh:",error);
-        });
-    },120);
   });
 })();
 </script>
