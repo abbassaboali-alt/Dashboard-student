@@ -1886,6 +1886,8 @@
     homeworkResults:[],
     activityResults:[],
     allActivityResults:[],
+    activityResultsReady:false,
+    homeworkResultsReady:false,
     examMap:new Map(),
     lastNotificationSignature:"",
     individualUnsubscribe:null,
@@ -2135,11 +2137,26 @@
         ...doc.data()
       }));
     }catch(error){
-      console.warn("Result query fallback:",error);
-      const snap = await db.collection("results").get();
-      docs = snap.docs
-        .map(doc=>({id:doc.id,...doc.data()}))
-        .filter(resultMatchesStudent);
+      console.warn("Result exact query:",error);
+    }
+
+    /*
+      If exact query is empty, scan historical result field variants.
+      This keeps old results visible and prevents solved homework/quiz
+      from appearing again as a notification.
+    */
+    if(!docs.length){
+      try{
+        const allSnap = await db.collection("results").get();
+
+        docs = allSnap.docs
+          .map(doc=>({id:doc.id,...doc.data()}))
+          .filter(resultMatchesStudent);
+      }catch(error){
+        console.warn("Result fallback scan:",error);
+      }
+    }else{
+      docs = docs.filter(resultMatchesStudent);
     }
 
     return docs;
@@ -2159,17 +2176,32 @@
         ...doc.data()
       }));
     }catch(error){
-      console.warn("Activity result query fallback:",error);
-      const snap = await db.collection("FunActivityResults").get();
-      docs = snap.docs
-        .map(doc=>({id:doc.id,...doc.data()}))
-        .filter(resultMatchesStudent);
+      console.warn("Activity result exact query:",error);
+    }
+
+    /*
+      Historical fallback: old activity result records may store the student
+      under another identity field. Keep those results visible too.
+    */
+    if(!docs.length){
+      try{
+        const allSnap = await db.collection("FunActivityResults").get();
+
+        docs = allSnap.docs
+          .map(doc=>({id:doc.id,...doc.data()}))
+          .filter(resultMatchesStudent);
+      }catch(error){
+        console.warn("Activity result fallback scan:",error);
+      }
+    }else{
+      docs = docs.filter(resultMatchesStudent);
     }
 
     return docs;
   }
 
   async function loadHomeworkState(){
+    state.homeworkResultsReady = false;
     /*
       Read exams + questions together.
       This fixes Homework notifications because Prudle currently stores
@@ -2331,6 +2363,8 @@
           state.openCourseIds.has(courseId)
         );
       });
+    state.homeworkResultsReady = true;
+
   }
 
   function activityCourseId(item){
@@ -2348,21 +2382,85 @@
     return `${activityId || title}__${courseId}`;
   }
 
+  function activitySessionTime(item){
+    return timestampValue(
+      (item && item.startedAt) ||
+      (item && item.createdAt) ||
+      (item && item.updatedAt)
+    );
+  }
+
+  function activityResultTime(item){
+    return timestampValue(
+      (item && item.createdAt) ||
+      (item && item.updatedAt)
+    );
+  }
+
   function hasSolvedActivity(session){
-    const sessionActivityId = safe((session && session.activityId) || (session && session.sourceActivityId));
+    const sessionActivityId =
+      safe((session && session.activityId) || (session && session.sourceActivityId));
     const sessionCourseId = activityCourseId(session);
-    const sessionTitle = safe((session && session.activityTitle) || (session && session.title));
+    const sessionTitle =
+      safe((session && session.activityTitle) || (session && session.title));
+
+    const sessionId = safe(session && session.id);
+    const sessionStartedAt = activitySessionTime(session);
 
     return state.activityResults.some(result=>{
-      const resultActivityId = safe((result && result.activityId) || (result && result.sourceActivityId));
+      const resultActivityId =
+        safe((result && result.activityId) || (result && result.sourceActivityId));
       const resultCourseId = activityCourseId(result);
-      const resultTitle = safe((result && result.activityTitle) || (result && result.title));
+      const resultTitle =
+        safe((result && result.activityTitle) || (result && result.title));
 
-      const sameActivity = sessionActivityId && resultActivityId
-        ? sessionActivityId === resultActivityId
-        : Boolean(sessionTitle && resultTitle && sessionTitle === resultTitle);
+      const sameActivity =
+        sessionActivityId && resultActivityId
+          ? sessionActivityId === resultActivityId
+          : Boolean(
+              sessionTitle &&
+              resultTitle &&
+              sessionTitle === resultTitle
+            );
 
-      return sameActivity && sessionCourseId === resultCourseId;
+      if(!sameActivity || sessionCourseId !== resultCourseId){
+        return false;
+      }
+
+      /*
+        If activity results ever store the exact live session/run ID,
+        use it as the strongest match.
+      */
+      const resultSessionId = safe(
+        (result && result.sessionId) ||
+        (result && result.liveSessionId) ||
+        (result && result.activitySessionId)
+      );
+
+      if(sessionId && resultSessionId){
+        return sessionId === resultSessionId;
+      }
+
+      /*
+        Current activity result format does not store the live session ID.
+        Therefore:
+        - a result completed AFTER this session started means this exact run
+          has already been solved -> hide notification.
+        - a trainer-created NEW session after the old result is a retake/new run
+          -> show notification again.
+      */
+      const resultCreatedAt = activityResultTime(result);
+
+      if(sessionStartedAt && resultCreatedAt){
+        return resultCreatedAt >= sessionStartedAt;
+      }
+
+      /*
+        Backward compatibility for old records with missing timestamps:
+        treat a matching saved result as solved so stale notifications do not
+        continue to appear forever.
+      */
+      return true;
     });
   }
 
@@ -2413,6 +2511,7 @@
   }
 
   async function loadActivityHistory(){
+    state.activityResultsReady = false;
     /*
       SAME RESULT-LOADING METHOD AS THE SECOND CODE:
       read only this student's results first.
@@ -2466,6 +2565,8 @@
         /* Keep the student's results visible even if ranking data fails. */
       }
     },0);
+    state.activityResultsReady = true;
+
   }
 
   function listenIndividualSessions(){
@@ -2491,7 +2592,16 @@
               timestampValue(a.updatedAt || a.startedAt)
             );
 
-          state.openIndividual = rows;
+          /*
+            Never show an activity notification before saved activity results
+            have loaded; otherwise a solved activity can flash as "new".
+          */
+          if(!state.activityResultsReady){
+            state.openIndividual = [];
+            return;
+          }
+
+          state.openIndividual = rows.filter(item=>!hasSolvedActivity(item));
           renderAll();
           maybeToastNewItems();
         },error=>{
@@ -3400,23 +3510,30 @@ td.score{font-weight:900;direction:ltr}
 
   async function refreshNonRealtimeData(){
     /*
-      Results are rendered even if one source fails.
-      This is important on mobile and on restrictive Firestore reads.
+      Load saved results first. Notifications are derived only afterwards.
+      This prevents solved homework/activity from reappearing as open.
     */
-    const tasks = await Promise.allSettled([
-      loadHomeworkState(),
-      loadActivityHistory()
-    ]);
+    const homeworkResult =
+      await Promise.resolve(loadHomeworkState())
+        .then(value=>({ok:true,value}))
+        .catch(error=>({ok:false,error}));
 
-    tasks.forEach((result,index)=>{
-      if(result.status === "rejected"){
-        console.warn(
-          index === 0 ? "Homework results load:" : "Activity results load:",
-          result.reason
-        );
-      }
-    });
+    const activityResult =
+      await Promise.resolve(loadActivityHistory())
+        .then(value=>({ok:true,value}))
+        .catch(error=>({ok:false,error}));
 
+    if(!homeworkResult.ok){
+      console.warn("Homework/results load:",homeworkResult.error);
+    }
+
+    if(!activityResult.ok){
+      console.warn("Activity/results load:",activityResult.error);
+    }
+
+    /*
+      Results remain visible even if one source fails.
+    */
     renderAll();
     maybeToastNewItems();
   }
