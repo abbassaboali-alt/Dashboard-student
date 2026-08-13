@@ -1356,59 +1356,7 @@
 
 </head>
 <body>
-
-<script id="prudle-early-logout-guard">
-(function(){
-  function getFlag(storage,key){
-    try{
-      return storage.getItem(key) || "";
-    }catch(error){
-      return "";
-    }
-  }
-
-  function hasFreshLoginIdentity(){
-    try{
-      return Boolean(
-        localStorage.getItem("studentID") ||
-        localStorage.getItem("student_iqama") ||
-        sessionStorage.getItem("studentID") ||
-        sessionStorage.getItem("student_iqama") ||
-        localStorage.getItem("username") ||
-        sessionStorage.getItem("username")
-      );
-    }catch(error){
-      return false;
-    }
-  }
-
-  function isExplicitlyLoggedOut(){
-    return (
-      window.__prudleForceLoggedOut === true ||
-      getFlag(localStorage,"studentLoggedOut") === "1" ||
-      getFlag(sessionStorage,"studentLoggedOut") === "1"
-    );
-  }
-
-  window.__prudleIsExplicitlyLoggedOut = isExplicitlyLoggedOut;
-
-  /*
-    Back/Forward Cache protection:
-    if logout happened and no NEW login identity has been written,
-    the portal must never become usable again.
-  */
-  if(isExplicitlyLoggedOut() && !hasFreshLoginIdentity()){
-    window.__prudleForceLoggedOut = true;
-    window.location.replace(
-      "https://www.prudle-education.com/log-in-out?logout=1&backBlocked=1&t=" +
-      Date.now()
-    );
-  }
-})();
-</script>
-
-
-  <div class="page-shell">
+<div class="page-shell">
     <div class="portal-wrap">
 
       <!-- HERO -->
@@ -1808,46 +1756,10 @@
     var fromUsername =
       usernameIsStudent ? username : "";
 
-    var loggedOut = false;
-    try{
-      loggedOut =
-        window.__prudleForceLoggedOut === true ||
-        localStorage.getItem("studentLoggedOut") === "1" ||
-        sessionStorage.getItem("studentLoggedOut") === "1";
-    }catch(error){
-      loggedOut = window.__prudleForceLoggedOut === true;
-    }
-
-    /*
-      After logout:
-      - stale query-string ID
-      - stale cookie ID
-      - stale in-memory ID
-      are NEVER accepted.
-      Only a genuinely new login written to storage can reopen the portal.
-    */
-    var freshLoginIdentity =
+    return String(
+      fromUrl ||
       fromStudentStorage ||
       fromUsername ||
-      "";
-
-    if(loggedOut && !freshLoginIdentity){
-      return "";
-    }
-
-    if(loggedOut && freshLoginIdentity){
-      try{
-        localStorage.removeItem("studentLoggedOut");
-        localStorage.removeItem("studentLogoutAt");
-        sessionStorage.removeItem("studentLoggedOut");
-        sessionStorage.removeItem("studentLogoutAt");
-      }catch(error){}
-      window.__prudleForceLoggedOut = false;
-    }
-
-    return String(
-      freshLoginIdentity ||
-      fromUrl ||
       window.__prudleStudentID ||
       prudleReadStudentCookie() ||
       ""
@@ -1983,21 +1895,6 @@
     .replace(/'/g,"&#039;");
 
   function getStudentKey(){
-    var loggedOut = false;
-
-    try{
-      loggedOut =
-        window.__prudleForceLoggedOut === true ||
-        localStorage.getItem("studentLoggedOut") === "1" ||
-        sessionStorage.getItem("studentLoggedOut") === "1";
-    }catch(error){
-      loggedOut = window.__prudleForceLoggedOut === true;
-    }
-
-    if(loggedOut){
-      return "";
-    }
-
     var key = "";
 
     try{
@@ -3723,10 +3620,12 @@ td.score{font-weight:900;direction:ltr}
 
   window.prudleStudentLogout = function(){
     /*
-      COMPLETE LOGOUT:
-      Stop all portal activity, clear every student identity,
-      then permanently mark this session as logged out.
+      IFRAME-SAFE TRUE LOGOUT
+      -----------------------
+      This portal is embedded from GitHub Pages inside Prudle.
+      Therefore logout must redirect the TOP page, not only this iframe.
     */
+
     try{
       if(state.individualUnsubscribe){
         state.individualUnsubscribe();
@@ -3754,7 +3653,9 @@ td.score{font-weight:900;direction:ltr}
       "loginDate",
       "prudleStudentID",
       "currentStudentID",
-      "currentStudentIqama"
+      "currentStudentIqama",
+      "studentLoggedOut",
+      "studentLogoutAt"
     ];
 
     try{
@@ -3785,7 +3686,6 @@ td.score{font-weight:900;direction:ltr}
     }catch(error){}
 
     window.__prudleStudentID = "";
-    window.__prudleForceLoggedOut = true;
 
     state.studentKey = "";
     state.studentName = "";
@@ -3801,24 +3701,23 @@ td.score{font-weight:900;direction:ltr}
     state.activityResultsReady = false;
     state.homeworkResultsReady = false;
 
+    var logoutUrl =
+      "https://www.prudle-education.com/log-in-out?logout=1&t=" +
+      Date.now();
+
     /*
-      IMPORTANT: write logout marker LAST, after all student values are gone.
-      A Back navigation can then be detected reliably.
+      top.location.replace() replaces the real browser history entry.
+      This prevents Back from restoring the portal after logout.
     */
     try{
-      localStorage.setItem("studentLoggedOut","1");
-      localStorage.setItem("studentLogoutAt",String(Date.now()));
-    }catch(error){}
-
-    try{
-      sessionStorage.setItem("studentLoggedOut","1");
-      sessionStorage.setItem("studentLogoutAt",String(Date.now()));
-    }catch(error){}
-
-    window.location.replace(
-      "https://www.prudle-education.com/log-in-out?logout=1&t=" +
-      Date.now()
-    );
+      if(window.top && window.top !== window){
+        window.top.location.replace(logoutUrl);
+      }else{
+        window.location.replace(logoutUrl);
+      }
+    }catch(error){
+      window.location.replace(logoutUrl);
+    }
   };
 
   window.goActivities = function(){
@@ -3833,24 +3732,7 @@ td.score{font-weight:900;direction:ltr}
   };
 
   async function boot(){
-    var loggedOut = false;
-
-    try{
-      loggedOut =
-        window.__prudleForceLoggedOut === true ||
-        localStorage.getItem("studentLoggedOut") === "1" ||
-        sessionStorage.getItem("studentLoggedOut") === "1";
-    }catch(error){}
-
-    if(loggedOut){
-      window.location.replace(
-        "https://www.prudle-education.com/log-in-out?logout=1&blocked=1&t=" +
-        Date.now()
-      );
-      return;
-    }
-
-    var attempts = 0;
+var attempts = 0;
     var maxAttempts = 20;
 
     async function tryStart(){
@@ -3962,31 +3844,9 @@ td.score{font-weight:900;direction:ltr}
     Any browser may restore the portal from memory.
     Always refresh notifications immediately when the page becomes active.
   */
-  window.addEventListener("pageshow",function(event){
-    var loggedOut = false;
-
-    try{
-      loggedOut =
-        window.__prudleForceLoggedOut === true ||
-        localStorage.getItem("studentLoggedOut") === "1" ||
-        sessionStorage.getItem("studentLoggedOut") === "1";
-    }catch(error){
-      loggedOut = window.__prudleForceLoggedOut === true;
-    }
-
-    /*
-      This is the key Back-button protection.
-      Safari/Chrome may restore the old DOM from BFCache; immediately leave it.
-    */
-    if(loggedOut){
-      window.location.replace(
-        "https://www.prudle-education.com/log-in-out?logout=1&backBlocked=1&t=" +
-        Date.now()
-      );
-      return;
-    }
-
+  window.addEventListener("pageshow",function(){
     state.studentKey = getStudentKey();
+
     if(!state.studentKey) return;
 
     loadStudentContext()
@@ -4005,22 +3865,6 @@ td.score{font-weight:900;direction:ltr}
 
   document.addEventListener("visibilitychange",function(){
     if(document.visibilityState !== "visible") return;
-
-    var loggedOut = false;
-    try{
-      loggedOut =
-        window.__prudleForceLoggedOut === true ||
-        localStorage.getItem("studentLoggedOut") === "1" ||
-        sessionStorage.getItem("studentLoggedOut") === "1";
-    }catch(error){}
-
-    if(loggedOut){
-      window.location.replace(
-        "https://www.prudle-education.com/log-in-out?logout=1&hiddenBlocked=1&t=" +
-        Date.now()
-      );
-      return;
-    }
 
     state.studentKey = getStudentKey();
     if(!state.studentKey) return;
