@@ -1883,6 +1883,8 @@
     examMap:new Map(),
     lastNotificationSignature:"",
     individualUnsubscribe:null,
+    courseUnsubscribe:null,
+    courseStatusSignature:"",
     refreshTimer:null
   };
 
@@ -2017,21 +2019,30 @@
   }
 
   function isPrudleCourseOpen(course){
+    /*
+      Match Course Management behavior:
+      course.status defaults to "open";
+      toggleCourse writes only "open" / "closed".
+    */
     const status = safe(
       course && (
         course.status ||
         course.Status ||
-        course.courseStatus
+        course.courseStatus ||
+        ""
       )
     ).toLowerCase();
 
-    return (
-      status === "open" ||
-      status === "مفتوح" ||
-      status === "opened" ||
-      status === "active" ||
-      (course && course.isOpen === true)
-    );
+    if(
+      status === "closed" ||
+      status === "مغلق" ||
+      status === "مغلقة" ||
+      status === "inactive"
+    ){
+      return false;
+    }
+
+    return true;
   }
 
   function visibleQuestionIds(exam,courseId){
@@ -2178,6 +2189,7 @@
     );
 
     state.openCourseIds = new Set(state.openCourses.keys());
+    state.courseStatusSignature = currentCourseStatusSignature();
 
     const smartTools =
       document.getElementById("prudleStudentSmartTools");
@@ -2191,6 +2203,88 @@
     }
 
     return true;
+  }
+
+  function currentCourseStatusSignature(){
+    return Array.from(state.openCourseIds || [])
+      .sort()
+      .join("|");
+  }
+
+  function listenStudentCourseStatus(){
+    if(state.courseUnsubscribe){
+      try{ state.courseUnsubscribe(); }catch(error){}
+      state.courseUnsubscribe = null;
+    }
+
+    state.courseUnsubscribe =
+      db.collection("Courses").onSnapshot(function(snapshot){
+        if(!state.courseIds || !state.courseIds.size){
+          return;
+        }
+
+        const openMap = new Map();
+
+        snapshot.docs.forEach(function(doc){
+          if(!state.courseIds.has(doc.id)){
+            return;
+          }
+
+          const course = {
+            id:doc.id,
+            ...doc.data()
+          };
+
+          if(isPrudleCourseOpen(course)){
+            openMap.set(doc.id,course);
+          }
+        });
+
+        state.openCourses = openMap;
+        state.openCourseIds = new Set(openMap.keys());
+
+        const nextSignature = currentCourseStatusSignature();
+
+        /*
+          Always remove stale notifications immediately when a course closes.
+        */
+        state.openHomework = (state.openHomework || []).filter(function(item){
+          return state.openCourseIds.has(safe(item.courseId));
+        });
+
+        state.openIndividual = (state.openIndividual || []).filter(function(item){
+          const courseId = safe(
+            item.courseId ||
+            item.participantCourseId ||
+            item.sourceCourseId
+          );
+          return !courseId || state.openCourseIds.has(courseId);
+        });
+
+        renderAll();
+
+        /*
+          If OPEN/CLOSE changed, reload both homework/quiz + activities.
+          This is what makes a reopened course immediately surface
+          Shown questions or active activities.
+        */
+        if(nextSignature !== state.courseStatusSignature){
+          state.courseStatusSignature = nextSignature;
+
+          refreshNonRealtimeData()
+            .then(function(){
+              renderAll();
+              listenIndividualSessions();
+        listenStudentCourseStatus();
+      listenStudentCourseStatus();
+            })
+            .catch(function(error){
+              console.warn("Course status notification refresh:",error);
+            });
+        }
+      },function(error){
+        console.warn("Course status listener:",error);
+      });
   }
 
   async function readStudentExamResults(){
@@ -2723,7 +2817,14 @@
               safe(item.mode).toLowerCase() === "individual" &&
               safe(item.status).toLowerCase() === "active" &&
               item.studentVisible !== false &&
-              state.openCourseIds.has(safe(item.courseId)) &&
+              state.openCourseIds.has(
+                safe(
+                  item.courseId ||
+                  item.participantCourseId ||
+                  item.sourceCourseId ||
+                  item.trainingCourseId
+                )
+              ) &&
               !hasSolvedActivity(item)
             )
             .sort((a,b)=>
@@ -3649,17 +3750,13 @@ td.score{font-weight:900;direction:ltr}
 
   async function refreshNonRealtimeData(){
     /*
-      IMPORTANT:
-      Refresh the student's course context FIRST.
-      This detects:
-        1) closed course -> opened course
-        2) newly linked course
-        3) status changed to Open / مفتوح
-      without requiring the student to visit Homework/Activities or reload.
+      Course state FIRST:
+      CLOSED course => no homework/activity notification.
+      OPEN course => evaluate Shown homework/quiz + active activities.
     */
     const contextOk = await Promise.resolve(loadStudentContext())
-      .catch(error=>{
-        console.warn("Course/student context refresh:",error);
+      .catch(function(error){
+        console.warn("Course context refresh:",error);
         return false;
       });
 
@@ -3668,25 +3765,27 @@ td.score{font-weight:900;direction:ltr}
       return;
     }
 
-    /*
-      Now read the latest Shown questions + saved results.
-    */
-    const homeworkResult =
-      await Promise.resolve(loadHomeworkState())
-        .then(value=>({ok:true,value}))
-        .catch(error=>({ok:false,error}));
-
-    const activityResult =
-      await Promise.resolve(loadActivityHistory())
-        .then(value=>({ok:true,value}))
-        .catch(error=>({ok:false,error}));
-
-    if(!homeworkResult.ok){
-      console.warn("Homework/results load:",homeworkResult.error);
+    function settle(promise){
+      return Promise.resolve(promise)
+        .then(function(value){
+          return {ok:true,value:value};
+        })
+        .catch(function(error){
+          return {ok:false,error:error};
+        });
     }
 
-    if(!activityResult.ok){
-      console.warn("Activity/results load:",activityResult.error);
+    const parts = await Promise.all([
+      settle(loadHomeworkState()),
+      settle(loadActivityHistory())
+    ]);
+
+    if(!parts[0].ok){
+      console.warn("Homework/quiz refresh:",parts[0].error);
+    }
+
+    if(!parts[1].ok){
+      console.warn("Activity refresh:",parts[1].error);
     }
 
     renderAll();
@@ -3792,6 +3891,10 @@ td.score{font-weight:900;direction:ltr}
       if(state.refreshTimer){
         clearInterval(state.refreshTimer);
         state.refreshTimer = null;
+      }
+      if(state.courseUnsubscribe){
+        try{ state.courseUnsubscribe(); }catch(error){}
+        state.courseUnsubscribe = null;
       }
     }catch(error){}
 
@@ -3930,6 +4033,7 @@ var attempts = 0;
         renderAll();
 
         listenIndividualSessions();
+        listenStudentCourseStatus();
 
         if(state.refreshTimer){
           clearInterval(state.refreshTimer);
@@ -3985,6 +4089,7 @@ var attempts = 0;
       .then(function(){
         renderAll();
         listenIndividualSessions();
+        listenStudentCourseStatus();
       })
       .catch(function(error){
         console.warn("Identity-ready notification refresh:",error);
@@ -4009,6 +4114,7 @@ var attempts = 0;
       .then(function(){
         renderAll();
         listenIndividualSessions();
+        listenStudentCourseStatus();
       })
       .catch(function(error){
         console.warn("pageshow notification refresh:",error);
