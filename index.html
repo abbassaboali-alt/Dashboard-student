@@ -2016,6 +2016,24 @@
     );
   }
 
+  function isPrudleCourseOpen(course){
+    const status = safe(
+      course && (
+        course.status ||
+        course.Status ||
+        course.courseStatus
+      )
+    ).toLowerCase();
+
+    return (
+      status === "open" ||
+      status === "مفتوح" ||
+      status === "opened" ||
+      status === "active" ||
+      (course && course.isOpen === true)
+    );
+  }
+
   function visibleQuestionIds(exam,courseId){
     const map =
       exam && exam.visibleQuestionsByCourse &&
@@ -2057,43 +2075,106 @@
       return false;
     }
 
-    const studentSnap = await db
-      .collection("students")
-      .where("iqama","==",state.studentKey)
-      .get();
+    let studentDocs = [];
 
-    state.studentDocs = studentSnap.docs.map(doc=>({
-      id:doc.id,
-      ...doc.data()
-    }));
+    try{
+      const studentSnap = await db
+        .collection("students")
+        .where("iqama","==",state.studentKey)
+        .get();
+
+      studentDocs = studentSnap.docs.map(doc=>({
+        id:doc.id,
+        ...doc.data()
+      }));
+    }catch(error){
+      console.warn("Student exact query:",error);
+    }
+
+    /*
+      Historical student records can use other ID field names.
+      Do not let an empty exact query make notifications disappear.
+    */
+    if(!studentDocs.length){
+      try{
+        const allStudents = await db.collection("students").get();
+
+        studentDocs = allStudents.docs
+          .map(doc=>({id:doc.id,...doc.data()}))
+          .filter(item=>{
+            const ids = [
+              item.iqama,
+              item.studentIqama,
+              item.studentID,
+              item.studentId,
+              item.ID,
+              item.idNumber,
+              item.username
+            ].map(safe);
+
+            return ids.includes(state.studentKey);
+          });
+      }catch(error){
+        console.warn("Student fallback scan:",error);
+      }
+    }
+
+    state.studentDocs = studentDocs;
 
     if(!state.studentDocs.length){
       return false;
     }
 
     state.studentName =
-      safe(state.studentDocs[0] && state.studentDocs[0].name) ||
+      safe(
+        (state.studentDocs[0] && state.studentDocs[0].name) ||
+        (state.studentDocs[0] && state.studentDocs[0].studentName)
+      ) ||
       "Student";
 
-    state.courseIds = new Set(
-      state.studentDocs
-        .map(item=>safe(item.courseId))
-        .filter(Boolean)
-    );
+    /*
+      A student may have more than one student document / course record.
+      Read every known course-id field.
+    */
+    const linkedCourseIds = [];
+
+    state.studentDocs.forEach(item=>{
+      [
+        item.courseId,
+        item.CourseId,
+        item.courseID,
+        item.trainingCourseId
+      ].forEach(value=>{
+        const id = safe(value);
+        if(id) linkedCourseIds.push(id);
+      });
+
+      if(Array.isArray(item.courseIds)){
+        item.courseIds.forEach(value=>{
+          const id = safe(value);
+          if(id) linkedCourseIds.push(id);
+        });
+      }
+    });
+
+    state.courseIds = new Set(linkedCourseIds);
 
     const courseDocs = await Promise.all(
-      [...state.courseIds].map(courseId=>
-        db.collection("Courses").doc(courseId).get()
-      )
+      Array.from(state.courseIds).map(async courseId=>{
+        try{
+          return await db.collection("Courses").doc(courseId).get();
+        }catch(error){
+          console.warn("Course reload:",courseId,error);
+          return null;
+        }
+      })
     );
 
     state.openCourses = new Map(
       courseDocs
-        .filter(doc=>doc.exists)
+        .filter(doc=>doc && doc.exists)
         .map(doc=>[doc.id,{id:doc.id,...doc.data()}])
-        .filter(([,course])=>
-          safe(course.status).toLowerCase() === "open"
-        )
+        .filter(([,course])=>isPrudleCourseOpen(course))
     );
 
     state.openCourseIds = new Set(state.openCourses.keys());
@@ -2101,9 +2182,6 @@
     const smartTools =
       document.getElementById("prudleStudentSmartTools");
     if(smartTools) smartTools.style.display = "grid";
-
-    var oldFab = document.getElementById("prudleStudentNotificationFab");
-    if(oldFab) oldFab.classList.add("show");
 
     const centerName =
       document.getElementById("prudleStudentCenterName");
@@ -2192,6 +2270,58 @@
     return docs;
   }
 
+  function prudleTimestampValue(value){
+    if(!value) return 0;
+
+    if(typeof value.toMillis === "function"){
+      try{ return value.toMillis(); }catch(error){}
+    }
+
+    if(
+      typeof value.seconds === "number"
+    ){
+      return (
+        value.seconds * 1000 +
+        Math.floor(
+          Number(value.nanoseconds || 0) / 1000000
+        )
+      );
+    }
+
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function resultIsNewEnoughForExam(result,exam){
+    if(!result) return false;
+
+    const resultTime = prudleTimestampValue(
+      result.updatedAt ||
+      result.createdAt ||
+      result.timestamp ||
+      result.submittedAt
+    );
+
+    const publishTime = prudleTimestampValue(
+      exam && (
+        exam.updatedAt ||
+        exam.publishedAt
+      )
+    );
+
+    /*
+      If timestamps are missing, preserve the old behavior:
+      an existing result means done.
+      If visibility was republished later, old result no longer suppresses
+      the new notification.
+    */
+    if(!publishTime || !resultTime){
+      return true;
+    }
+
+    return resultTime >= publishTime;
+  }
+
   async function loadHomeworkState(){
     state.homeworkResultsReady = false;
     /*
@@ -2254,11 +2384,22 @@
         .add(doc.id);
     });
 
-    const resultKeySet = new Set(
-      resultRows.map(row=>
-        `${safe(row.examId)}__${safe(row.courseId)}`
-      )
-    );
+    const resultsByExamCourse = new Map();
+
+    resultRows.forEach(row=>{
+      const key =
+        `${safe(row.examId)}__${safe(
+          row.courseId ||
+          row.participantCourseId ||
+          row.sourceCourseId
+        )}`;
+
+      if(!resultsByExamCourse.has(key)){
+        resultsByExamCourse.set(key,[]);
+      }
+
+      resultsByExamCourse.get(key).push(row);
+    });
 
     const homeworkExamIds =
       new Set();
@@ -2317,9 +2458,15 @@
 
         homeworkExamIds.add(examId);
 
+        const resultKey =
+          `${examId}__${safe(courseId)}`;
+
+        const oldResults =
+          resultsByExamCourse.get(resultKey) || [];
+
         const done =
-          resultKeySet.has(
-            `${examId}__${safe(courseId)}`
+          oldResults.some(result=>
+            resultIsNewEnoughForExam(result,exam)
           );
 
         homeworkRows.push({
@@ -3502,8 +3649,27 @@ td.score{font-weight:900;direction:ltr}
 
   async function refreshNonRealtimeData(){
     /*
-      Load saved results first. Notifications are derived only afterwards.
-      This prevents solved homework/activity from reappearing as open.
+      IMPORTANT:
+      Refresh the student's course context FIRST.
+      This detects:
+        1) closed course -> opened course
+        2) newly linked course
+        3) status changed to Open / مفتوح
+      without requiring the student to visit Homework/Activities or reload.
+    */
+    const contextOk = await Promise.resolve(loadStudentContext())
+      .catch(error=>{
+        console.warn("Course/student context refresh:",error);
+        return false;
+      });
+
+    if(!contextOk){
+      renderAll();
+      return;
+    }
+
+    /*
+      Now read the latest Shown questions + saved results.
     */
     const homeworkResult =
       await Promise.resolve(loadHomeworkState())
@@ -3523,9 +3689,6 @@ td.score{font-weight:900;direction:ltr}
       console.warn("Activity/results load:",activityResult.error);
     }
 
-    /*
-      Results remain visible even if one source fails.
-    */
     renderAll();
     maybeToastNewItems();
   }
@@ -3553,28 +3716,17 @@ td.score{font-weight:900;direction:ltr}
 
     switchPrudleStudentTab(tab);
 
-    /* If context was not ready yet, load it now without leaving the page. */
-    if(state.studentKey && !state.studentDocs.length){
-      loadStudentContext()
-        .then(function(ok){
-          if(!ok) return;
-          return refreshNonRealtimeData();
-        })
+    /*
+      Always fetch fresh course status + Shown questions when the center opens.
+      This makes a newly opened course appear immediately.
+    */
+    if(state.studentKey){
+      refreshNonRealtimeData()
         .then(function(){
           renderAll();
         })
         .catch(function(error){
-          console.warn("Notification center lazy load:",error);
-          const feed = document.getElementById(
-            tab === "history" ? "prudleHistoryFeed" : "prudleNotificationFeed"
-          );
-          if(feed){
-            feed.innerHTML = `
-              <div class="prudle-empty-smart">
-                تعذر تحميل البيانات مؤقتًا. اضغط على الإشعارات مرة أخرى بعد لحظات.
-              </div>
-            `;
-          }
+          console.warn("Notification center fresh load:",error);
         });
     }
 
@@ -3785,7 +3937,7 @@ var attempts = 0;
 
         state.refreshTimer = setInterval(
           refreshNonRealtimeData,
-          30000
+          10000
         );
 
       }catch(error){
