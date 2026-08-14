@@ -1883,8 +1883,7 @@
     examMap:new Map(),
     lastNotificationSignature:"",
     individualUnsubscribe:null,
-    courseUnsubscribe:null,
-    courseStatusSignature:"",
+    individualPollTimer:null,
     refreshTimer:null
   };
 
@@ -2019,11 +2018,6 @@
   }
 
   function isPrudleCourseOpen(course){
-    /*
-      Match Course Management behavior:
-      course.status defaults to "open";
-      toggleCourse writes only "open" / "closed".
-    */
     const status = safe(
       course && (
         course.status ||
@@ -2033,50 +2027,91 @@
       )
     ).toLowerCase();
 
-    if(
+    /*
+      Prudle Course Management treats a missing status as OPEN.
+      Only an explicit closed/inactive value blocks notifications.
+    */
+    return !(
       status === "closed" ||
       status === "مغلق" ||
       status === "مغلقة" ||
       status === "inactive"
-    ){
-      return false;
-    }
+    );
+  }
 
-    return true;
+  function getAnyCourseId(item){
+    return safe(
+      item && (
+        item.courseId ||
+        item.CourseId ||
+        item.courseID ||
+        item.trainingCourseId ||
+        item.participantCourseId ||
+        item.sourceCourseId ||
+        item.currentCourseId ||
+        ""
+      )
+    );
   }
 
   function visibleQuestionIds(exam,courseId){
     const map =
-      exam && exam.visibleQuestionsByCourse &&
+      exam &&
+      exam.visibleQuestionsByCourse &&
       typeof exam.visibleQuestionsByCourse === "object"
         ? exam.visibleQuestionsByCourse
         : {};
 
-    if(!Object.prototype.hasOwnProperty.call(map,courseId)){
-      return [];
+    const wanted = safe(courseId);
+
+    let value = null;
+
+    if(Object.prototype.hasOwnProperty.call(map,wanted)){
+      value = map[wanted];
+    }else{
+      const matchingKey = Object.keys(map).find(key=>
+        safe(key) === wanted
+      );
+
+      if(matchingKey){
+        value = map[matchingKey];
+      }
     }
 
-    return Array.isArray(map[courseId])
-      ? map[courseId].map(safe).filter(Boolean)
+    return Array.isArray(value)
+      ? value.map(safe).filter(Boolean)
       : [];
   }
 
   function resultMatchesStudent(row){
-    const key = state.studentKey;
+    row = row || {};
+
+    const key = safe(state.studentKey);
+
     const docIds = new Set(
-      state.studentDocs.map(item=>safe(item.id)).filter(Boolean)
+      (state.studentDocs || [])
+        .map(item=>safe(item.id))
+        .filter(Boolean)
     );
 
-    return (
-      safe(row.studentIqama) === key ||
-      safe(row.studentID) === key ||
-      safe(row.studentId) === key ||
-      safe(row.studentDocId) === key ||
-      docIds.has(safe(row.studentId)) ||
-      docIds.has(safe(row.studentDocId)) ||
-      safe(row.participantId) === key ||
-      docIds.has(safe(row.participantId))
-    );
+    const values = [
+      row.studentIqama,
+      row.iqama,
+      row.studentID,
+      row.studentId,
+      row.studentDocId,
+      row.participantId,
+      row.participantID,
+      row.participantIqama,
+      row.userId,
+      row.userID
+    ].map(safe).filter(Boolean);
+
+    if(values.indexOf(key) !== -1){
+      return true;
+    }
+
+    return values.some(value=>docIds.has(value));
   }
 
   async function loadStudentContext(){
@@ -2086,51 +2121,90 @@
       return false;
     }
 
-    let studentDocs = [];
+    const key = safe(state.studentKey);
+    const numericKey =
+      /^\d+$/.test(key) && Number.isSafeInteger(Number(key))
+        ? Number(key)
+        : null;
 
-    try{
-      const studentSnap = await db
-        .collection("students")
-        .where("iqama","==",state.studentKey)
-        .get();
-
-      studentDocs = studentSnap.docs.map(doc=>({
-        id:doc.id,
-        ...doc.data()
-      }));
-    }catch(error){
-      console.warn("Student exact query:",error);
-    }
+    const found = new Map();
 
     /*
-      Historical student records can use other ID field names.
-      Do not let an empty exact query make notifications disappear.
+      Query all common student-ID fields.
+      This fixes students whose records were created by older/newer pages
+      using different identity field names or number-vs-string iqama.
     */
-    if(!studentDocs.length){
+    const identityFields = [
+      "iqama",
+      "studentIqama",
+      "studentID",
+      "studentId"
+    ];
+
+    const queryJobs = [];
+
+    identityFields.forEach(field=>{
+      queryJobs.push(
+        db.collection("students")
+          .where(field,"==",key)
+          .get()
+          .catch(()=>null)
+      );
+
+      if(numericKey !== null){
+        queryJobs.push(
+          db.collection("students")
+            .where(field,"==",numericKey)
+            .get()
+            .catch(()=>null)
+        );
+      }
+    });
+
+    const snaps = await Promise.all(queryJobs);
+
+    snaps.forEach(snap=>{
+      if(!snap) return;
+
+      snap.docs.forEach(doc=>{
+        found.set(doc.id,{
+          id:doc.id,
+          ...doc.data()
+        });
+      });
+    });
+
+    /*
+      Last-resort historical fallback.
+      Run only if indexed identity queries found nothing.
+    */
+    if(!found.size){
       try{
-        const allStudents = await db.collection("students").get();
+        const allSnap = await db.collection("students").get();
 
-        studentDocs = allStudents.docs
-          .map(doc=>({id:doc.id,...doc.data()}))
-          .filter(item=>{
-            const ids = [
-              item.iqama,
-              item.studentIqama,
-              item.studentID,
-              item.studentId,
-              item.ID,
-              item.idNumber,
-              item.username
-            ].map(safe);
+        allSnap.docs.forEach(doc=>{
+          const item = {id:doc.id,...doc.data()};
 
-            return ids.includes(state.studentKey);
-          });
+          const identities = [
+            item.iqama,
+            item.studentIqama,
+            item.studentID,
+            item.studentId,
+            item.ID,
+            item.idNumber,
+            item.username
+          ].map(safe);
+
+          if(identities.indexOf(key) !== -1){
+            found.set(doc.id,item);
+          }
+        });
       }catch(error){
         console.warn("Student fallback scan:",error);
       }
     }
 
-    state.studentDocs = studentDocs;
+    state.studentDocs = [...found.values()];
 
     if(!state.studentDocs.length){
       return false;
@@ -2139,43 +2213,50 @@
     state.studentName =
       safe(
         (state.studentDocs[0] && state.studentDocs[0].name) ||
-        (state.studentDocs[0] && state.studentDocs[0].studentName)
+        (state.studentDocs[0] && state.studentDocs[0].studentName) ||
+        (state.studentDocs[0] && state.studentDocs[0].name_en)
       ) ||
       "Student";
 
     /*
-      A student may have more than one student document / course record.
-      Read every known course-id field.
+      Collect EVERY course reference attached to this student.
     */
-    const linkedCourseIds = [];
+    const courseIds = new Set();
 
     state.studentDocs.forEach(item=>{
       [
         item.courseId,
         item.CourseId,
         item.courseID,
-        item.trainingCourseId
+        item.trainingCourseId,
+        item.currentCourseId
       ].forEach(value=>{
         const id = safe(value);
-        if(id) linkedCourseIds.push(id);
+        if(id) courseIds.add(id);
       });
 
-      if(Array.isArray(item.courseIds)){
-        item.courseIds.forEach(value=>{
-          const id = safe(value);
-          if(id) linkedCourseIds.push(id);
-        });
-      }
+      [
+        item.courseIds,
+        item.CourseIds,
+        item.trainingCourseIds
+      ].forEach(list=>{
+        if(Array.isArray(list)){
+          list.forEach(value=>{
+            const id = safe(value);
+            if(id) courseIds.add(id);
+          });
+        }
+      });
     });
 
-    state.courseIds = new Set(linkedCourseIds);
+    state.courseIds = courseIds;
 
     const courseDocs = await Promise.all(
-      Array.from(state.courseIds).map(async courseId=>{
+      [...state.courseIds].map(async courseId=>{
         try{
           return await db.collection("Courses").doc(courseId).get();
         }catch(error){
-          console.warn("Course reload:",courseId,error);
+          console.warn("Course load:",courseId,error);
           return null;
         }
       })
@@ -2184,107 +2265,34 @@
     state.openCourses = new Map(
       courseDocs
         .filter(doc=>doc && doc.exists)
-        .map(doc=>[doc.id,{id:doc.id,...doc.data()}])
-        .filter(([,course])=>isPrudleCourseOpen(course))
+        .map(doc=>[
+          doc.id,
+          {id:doc.id,...doc.data()}
+        ])
+        .filter(([,course])=>
+          isPrudleCourseOpen(course)
+        )
     );
 
-    state.openCourseIds = new Set(state.openCourses.keys());
-    state.courseStatusSignature = currentCourseStatusSignature();
+    state.openCourseIds =
+      new Set(state.openCourses.keys());
 
     const smartTools =
       document.getElementById("prudleStudentSmartTools");
-    if(smartTools) smartTools.style.display = "grid";
+
+    if(smartTools){
+      smartTools.style.display = "grid";
+    }
 
     const centerName =
       document.getElementById("prudleStudentCenterName");
+
     if(centerName){
       centerName.textContent =
         state.studentName + " — الإشعارات والدرجات";
     }
 
     return true;
-  }
-
-  function currentCourseStatusSignature(){
-    return Array.from(state.openCourseIds || [])
-      .sort()
-      .join("|");
-  }
-
-  function listenStudentCourseStatus(){
-    if(state.courseUnsubscribe){
-      try{ state.courseUnsubscribe(); }catch(error){}
-      state.courseUnsubscribe = null;
-    }
-
-    state.courseUnsubscribe =
-      db.collection("Courses").onSnapshot(function(snapshot){
-        if(!state.courseIds || !state.courseIds.size){
-          return;
-        }
-
-        const openMap = new Map();
-
-        snapshot.docs.forEach(function(doc){
-          if(!state.courseIds.has(doc.id)){
-            return;
-          }
-
-          const course = {
-            id:doc.id,
-            ...doc.data()
-          };
-
-          if(isPrudleCourseOpen(course)){
-            openMap.set(doc.id,course);
-          }
-        });
-
-        state.openCourses = openMap;
-        state.openCourseIds = new Set(openMap.keys());
-
-        const nextSignature = currentCourseStatusSignature();
-
-        /*
-          Always remove stale notifications immediately when a course closes.
-        */
-        state.openHomework = (state.openHomework || []).filter(function(item){
-          return state.openCourseIds.has(safe(item.courseId));
-        });
-
-        state.openIndividual = (state.openIndividual || []).filter(function(item){
-          const courseId = safe(
-            item.courseId ||
-            item.participantCourseId ||
-            item.sourceCourseId
-          );
-          return !courseId || state.openCourseIds.has(courseId);
-        });
-
-        renderAll();
-
-        /*
-          If OPEN/CLOSE changed, reload both homework/quiz + activities.
-          This is what makes a reopened course immediately surface
-          Shown questions or active activities.
-        */
-        if(nextSignature !== state.courseStatusSignature){
-          state.courseStatusSignature = nextSignature;
-
-          refreshNonRealtimeData()
-            .then(function(){
-              renderAll();
-              listenIndividualSessions();
-        listenStudentCourseStatus();
-      listenStudentCourseStatus();
-            })
-            .catch(function(error){
-              console.warn("Course status notification refresh:",error);
-            });
-        }
-      },function(error){
-        console.warn("Course status listener:",error);
-      });
   }
 
   async function readStudentExamResults(){
@@ -2364,58 +2372,6 @@
     return docs;
   }
 
-  function prudleTimestampValue(value){
-    if(!value) return 0;
-
-    if(typeof value.toMillis === "function"){
-      try{ return value.toMillis(); }catch(error){}
-    }
-
-    if(
-      typeof value.seconds === "number"
-    ){
-      return (
-        value.seconds * 1000 +
-        Math.floor(
-          Number(value.nanoseconds || 0) / 1000000
-        )
-      );
-    }
-
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  function resultIsNewEnoughForExam(result,exam){
-    if(!result) return false;
-
-    const resultTime = prudleTimestampValue(
-      result.updatedAt ||
-      result.createdAt ||
-      result.timestamp ||
-      result.submittedAt
-    );
-
-    const publishTime = prudleTimestampValue(
-      exam && (
-        exam.updatedAt ||
-        exam.publishedAt
-      )
-    );
-
-    /*
-      If timestamps are missing, preserve the old behavior:
-      an existing result means done.
-      If visibility was republished later, old result no longer suppresses
-      the new notification.
-    */
-    if(!publishTime || !resultTime){
-      return true;
-    }
-
-    return resultTime >= publishTime;
-  }
-
   async function loadHomeworkState(){
     state.homeworkResultsReady = false;
     /*
@@ -2478,22 +2434,11 @@
         .add(doc.id);
     });
 
-    const resultsByExamCourse = new Map();
-
-    resultRows.forEach(row=>{
-      const key =
-        `${safe(row.examId)}__${safe(
-          row.courseId ||
-          row.participantCourseId ||
-          row.sourceCourseId
-        )}`;
-
-      if(!resultsByExamCourse.has(key)){
-        resultsByExamCourse.set(key,[]);
-      }
-
-      resultsByExamCourse.get(key).push(row);
-    });
+    const resultKeySet = new Set(
+      resultRows.map(row=>
+        `${safe(row.examId)}__${getAnyCourseId(row)}`
+      )
+    );
 
     const homeworkExamIds =
       new Set();
@@ -2552,15 +2497,9 @@
 
         homeworkExamIds.add(examId);
 
-        const resultKey =
-          `${examId}__${safe(courseId)}`;
-
-        const oldResults =
-          resultsByExamCourse.get(resultKey) || [];
-
         const done =
-          oldResults.some(result=>
-            resultIsNewEnoughForExam(result,exam)
+          resultKeySet.has(
+            `${examId}__${safe(courseId)}`
           );
 
         homeworkRows.push({
@@ -2601,11 +2540,7 @@
   }
 
   function activityCourseId(item){
-    return safe(
-      (item && item.courseId) ||
-      (item && item.participantCourseId) ||
-      (item && item.sourceCourseId)
-    );
+    return getAnyCourseId(item);
   }
 
   function activityIdentity(item){
@@ -2802,51 +2737,106 @@
 
   }
 
+  function isLiveActivityForCurrentStudent(item){
+    item = item || {};
+
+    const courseId = activityCourseId(item);
+
+    if(!courseId || !state.openCourseIds.has(courseId)){
+      return false;
+    }
+
+    if(
+      safe(item.mode).toLowerCase() !== "individual" ||
+      safe(item.status).toLowerCase() !== "active" ||
+      item.studentVisible === false
+    ){
+      return false;
+    }
+
+    /*
+      If the live session explicitly targets students, respect the target.
+      Otherwise it is available to every student in the open course.
+    */
+    const key = safe(state.studentKey);
+
+    const directTargets = [
+      item.studentId,
+      item.studentID,
+      item.studentIqama,
+      item.participantId,
+      item.targetStudentId,
+      item.targetStudentID
+    ].map(safe).filter(Boolean);
+
+    if(directTargets.length && directTargets.indexOf(key) === -1){
+      return false;
+    }
+
+    const targetArrays = [
+      item.studentIds,
+      item.studentIDs,
+      item.studentIqamas,
+      item.participantIds,
+      item.allowedStudents,
+      item.visibleToStudents
+    ];
+
+    for(let i=0;i<targetArrays.length;i++){
+      if(Array.isArray(targetArrays[i]) && targetArrays[i].length){
+        if(targetArrays[i].map(safe).indexOf(key) === -1){
+          return false;
+        }
+      }
+    }
+
+    return !hasSolvedActivity(item);
+  }
+
+  function applyLiveActivitySnapshot(snapshot){
+    if(!state.activityResultsReady){
+      state.openIndividual = [];
+      renderAll();
+      return;
+    }
+
+    state.openIndividual = snapshot.docs
+      .map(doc=>({id:doc.id,...doc.data()}))
+      .filter(isLiveActivityForCurrentStudent)
+      .sort((a,b)=>
+        timestampValue(b.updatedAt || b.startedAt || b.createdAt) -
+        timestampValue(a.updatedAt || a.startedAt || a.createdAt)
+      );
+
+    renderAll();
+    maybeToastNewItems();
+  }
+
+  async function loadLiveActivityNotificationsOnce(){
+    try{
+      const snapshot =
+        await db.collection("FunActivityLiveSessions").get();
+
+      applyLiveActivitySnapshot(snapshot);
+    }catch(error){
+      console.warn("Live activity one-time refresh:",error);
+    }
+  }
+
   function listenIndividualSessions(){
     if(state.individualUnsubscribe){
-      state.individualUnsubscribe();
+      try{ state.individualUnsubscribe(); }catch(error){}
       state.individualUnsubscribe = null;
     }
 
     state.individualUnsubscribe =
       db.collection("FunActivityLiveSessions")
-        .onSnapshot(snapshot=>{
-          const rows = snapshot.docs
-            .map(doc=>({id:doc.id,...doc.data()}))
-            .filter(item=>
-              safe(item.mode).toLowerCase() === "individual" &&
-              safe(item.status).toLowerCase() === "active" &&
-              item.studentVisible !== false &&
-              state.openCourseIds.has(
-                safe(
-                  item.courseId ||
-                  item.participantCourseId ||
-                  item.sourceCourseId ||
-                  item.trainingCourseId
-                )
-              ) &&
-              !hasSolvedActivity(item)
-            )
-            .sort((a,b)=>
-              timestampValue(b.updatedAt || b.startedAt) -
-              timestampValue(a.updatedAt || a.startedAt)
-            );
-
-          /*
-            Never show an activity notification before saved activity results
-            have loaded; otherwise a solved activity can flash as "new".
-          */
-          if(!state.activityResultsReady){
-            state.openIndividual = [];
-            return;
+        .onSnapshot(
+          applyLiveActivitySnapshot,
+          error=>{
+            console.warn("Individual notifications:",error);
           }
-
-          state.openIndividual = rows.filter(item=>!hasSolvedActivity(item));
-          renderAll();
-          maybeToastNewItems();
-        },error=>{
-          console.warn("Individual notifications:",error);
-        });
+        );
   }
 
   function formatScore(score,total,percent){
@@ -3750,15 +3740,18 @@ td.score{font-weight:900;direction:ltr}
 
   async function refreshNonRealtimeData(){
     /*
-      Course state FIRST:
-      CLOSED course => no homework/activity notification.
-      OPEN course => evaluate Shown homework/quiz + active activities.
+      Always refresh student-course membership first.
+      This is essential when:
+      - a course is opened/closed,
+      - a student is moved/added to a course,
+      - an older student record uses another identity field.
     */
-    const contextOk = await Promise.resolve(loadStudentContext())
-      .catch(function(error){
-        console.warn("Course context refresh:",error);
-        return false;
-      });
+    const contextOk =
+      await Promise.resolve(loadStudentContext())
+        .catch(error=>{
+          console.warn("Student/course context refresh:",error);
+          return false;
+        });
 
     if(!contextOk){
       renderAll();
@@ -3767,81 +3760,93 @@ td.score{font-weight:900;direction:ltr}
 
     function settle(promise){
       return Promise.resolve(promise)
-        .then(function(value){
-          return {ok:true,value:value};
-        })
-        .catch(function(error){
-          return {ok:false,error:error};
-        });
+        .then(value=>({ok:true,value}))
+        .catch(error=>({ok:false,error}));
     }
 
-    const parts = await Promise.all([
-      settle(loadHomeworkState()),
-      settle(loadActivityHistory())
-    ]);
+    const homeworkResult =
+      await settle(loadHomeworkState());
 
-    if(!parts[0].ok){
-      console.warn("Homework/quiz refresh:",parts[0].error);
+    const activityResult =
+      await settle(loadActivityHistory());
+
+    /*
+      Load active activity sessions AFTER student activity results,
+      so a solved activity does not flash as a new notification.
+    */
+    const liveActivityResult =
+      await settle(loadLiveActivityNotificationsOnce());
+
+    if(!homeworkResult.ok){
+      console.warn("Homework/results load:",homeworkResult.error);
     }
 
-    if(!parts[1].ok){
-      console.warn("Activity refresh:",parts[1].error);
+    if(!activityResult.ok){
+      console.warn("Activity/results load:",activityResult.error);
+    }
+
+    if(!liveActivityResult.ok){
+      console.warn("Live activity load:",liveActivityResult.error);
     }
 
     renderAll();
     maybeToastNewItems();
   }
 
-  window.openPrudleStudentCenter = function(tab="notifications"){
-    /*
-      IMPORTANT:
-      Opening notifications must NEVER log the student out.
-      On mobile/desktop the click can happen before Firebase boot completes.
-    */
+  window.openPrudleStudentCenter = function(tab){
+    tab = tab || "notifications";
+
     if(!state.studentKey){
       state.studentKey = getStudentKey();
     }
 
-    const panel = document.getElementById("prudleStudentCenterPanel");
-    const backdrop = document.getElementById("prudleStudentCenterBackdrop");
+    const panel =
+      document.getElementById("prudleStudentCenterPanel");
+
+    const backdrop =
+      document.getElementById("prudleStudentCenterBackdrop");
 
     if(panel){
       panel.classList.add("open");
       panel.setAttribute("aria-hidden","false");
     }
+
     if(backdrop){
       backdrop.classList.add("open");
     }
 
     switchPrudleStudentTab(tab);
 
-    /*
-      Always fetch fresh course status + Shown questions when the center opens.
-      This makes a newly opened course appear immediately.
-    */
     if(state.studentKey){
+      /*
+        Recheck everything whenever the student opens notifications.
+        This prevents stale "0 notifications" for some students.
+      */
       refreshNonRealtimeData()
         .then(function(){
           renderAll();
         })
         .catch(function(error){
-          console.warn("Notification center fresh load:",error);
+          console.warn("Notification center refresh:",error);
         });
+
+      return;
     }
 
-    /* No student key: show a message, do not redirect or clear login. */
-    if(!state.studentKey){
-      const message = `
-        <div class="prudle-empty-smart">
-          لم يتم العثور على رقم الطالب في هذه الصفحة.<br>
-          ارجع إلى بوابة الطالب ثم افتح الإشعارات مرة أخرى.
-        </div>
-      `;
-      const nf = document.getElementById("prudleNotificationFeed");
-      const hf = document.getElementById("prudleHistoryFeed");
-      if(nf) nf.innerHTML = message;
-      if(hf) hf.innerHTML = message;
-    }
+    const message =
+      '<div class="prudle-empty-smart">' +
+      'لم يتم العثور على رقم الطالب في هذه الصفحة.<br>' +
+      'ارجع إلى بوابة الطالب ثم افتح الإشعارات مرة أخرى.' +
+      '</div>';
+
+    const nf =
+      document.getElementById("prudleNotificationFeed");
+
+    const hf =
+      document.getElementById("prudleHistoryFeed");
+
+    if(nf) nf.innerHTML = message;
+    if(hf) hf.innerHTML = message;
   };
 
   window.closePrudleStudentCenter = function(){
@@ -3891,10 +3896,6 @@ td.score{font-weight:900;direction:ltr}
       if(state.refreshTimer){
         clearInterval(state.refreshTimer);
         state.refreshTimer = null;
-      }
-      if(state.courseUnsubscribe){
-        try{ state.courseUnsubscribe(); }catch(error){}
-        state.courseUnsubscribe = null;
       }
     }catch(error){}
 
@@ -4033,7 +4034,6 @@ var attempts = 0;
         renderAll();
 
         listenIndividualSessions();
-        listenStudentCourseStatus();
 
         if(state.refreshTimer){
           clearInterval(state.refreshTimer);
@@ -4089,7 +4089,6 @@ var attempts = 0;
       .then(function(){
         renderAll();
         listenIndividualSessions();
-        listenStudentCourseStatus();
       })
       .catch(function(error){
         console.warn("Identity-ready notification refresh:",error);
@@ -4114,7 +4113,6 @@ var attempts = 0;
       .then(function(){
         renderAll();
         listenIndividualSessions();
-        listenStudentCourseStatus();
       })
       .catch(function(error){
         console.warn("pageshow notification refresh:",error);
