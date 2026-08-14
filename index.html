@@ -3703,6 +3703,42 @@
       : 0;
 
     setText("prudleAverageGrade",avg + "%");
+    /*
+      ACTIVATE THE FLASH:
+      - first successful load with one or more pending notifications => flash now
+      - if total later increases => flash again
+      - if total returns to 0, allow next future notification to flash again
+    */
+    var currentTotal =
+      (state.openIndividual || []).length +
+      (state.openHomework || []).length;
+
+    var previousTotal =
+      Number(window.__prudlePreviousNotificationTotal || 0);
+
+    if(currentTotal === 0){
+      window.__prudleInitialNotificationFlashDone = false;
+    }
+
+    if(
+      currentTotal > 0 &&
+      (
+        !window.__prudleInitialNotificationFlashDone ||
+        currentTotal > previousTotal
+      )
+    ){
+      window.__prudleInitialNotificationFlashDone = true;
+
+      if(typeof prudleFlashNotificationUI === "function"){
+        requestAnimationFrame(function(){
+          prudleFlashNotificationUI();
+        });
+      }
+    }
+
+    window.__prudlePreviousNotificationTotal =
+      currentTotal;
+
   }
 
 
@@ -4286,7 +4322,7 @@ td.score{font-weight:900;direction:ltr}
 
         if(!state.studentKey){
           if(attempts < maxAttempts){
-            setTimeout(tryStart,120);
+            setTimeout(tryStart,80);
           }
           return;
         }
@@ -4295,7 +4331,7 @@ td.score{font-weight:900;direction:ltr}
 
         if(!ok){
           if(attempts < maxAttempts){
-            setTimeout(tryStart,180);
+            setTimeout(tryStart,120);
           }
           return;
         }
@@ -4308,6 +4344,15 @@ td.score{font-weight:900;direction:ltr}
         try{
           await loadHomeworkState();
           renderAll();
+
+          if(
+            (state.openHomework || []).length > 0 &&
+            typeof prudleFlashNotificationUI === "function"
+          ){
+            requestAnimationFrame(function(){
+              prudleFlashNotificationUI();
+            });
+          }
         }catch(error){
           console.warn("Immediate homework notification load:",error);
         }
@@ -4319,6 +4364,19 @@ td.score{font-weight:900;direction:ltr}
           await loadActivityHistory();
           await loadLiveActivityNotificationsOnce();
           renderAll();
+
+          if(
+            (
+              (state.openIndividual || []).length +
+              (state.openHomework || []).length
+            ) > 0 &&
+            typeof prudleFlashNotificationUI === "function"
+          ){
+            requestAnimationFrame(function(){
+              prudleFlashNotificationUI();
+            });
+          }
+
           maybeToastNewItems();
         }catch(error){
           console.warn("Immediate activity notification load:",error);
@@ -4382,6 +4440,16 @@ td.score{font-weight:900;direction:ltr}
       })
       .then(function(){
         renderAll();
+
+        if(
+          (state.openHomework || []).length > 0 &&
+          typeof prudleFlashNotificationUI === "function"
+        ){
+          requestAnimationFrame(function(){
+            prudleFlashNotificationUI();
+          });
+        }
+
         return loadActivityHistory();
       })
       .then(function(){
@@ -4389,6 +4457,19 @@ td.score{font-weight:900;direction:ltr}
       })
       .then(function(){
         renderAll();
+
+        if(
+          (
+            (state.openIndividual || []).length +
+            (state.openHomework || []).length
+          ) > 0 &&
+          typeof prudleFlashNotificationUI === "function"
+        ){
+          requestAnimationFrame(function(){
+            prudleFlashNotificationUI();
+          });
+        }
+
         maybeToastNewItems();
         listenIndividualSessions();
       })
@@ -4414,6 +4495,16 @@ td.score{font-weight:900;direction:ltr}
       })
       .then(function(){
         renderAll();
+
+        if(
+          (state.openHomework || []).length > 0 &&
+          typeof prudleFlashNotificationUI === "function"
+        ){
+          requestAnimationFrame(function(){
+            prudleFlashNotificationUI();
+          });
+        }
+
         return loadActivityHistory();
       })
       .then(function(){
