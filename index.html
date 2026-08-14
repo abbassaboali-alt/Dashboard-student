@@ -2018,6 +2018,10 @@
   }
 
   function isPrudleCourseOpen(course){
+    /*
+      EXACT match with Prudle Student Exam System:
+      loadStudentCourses() uses normalizeStatus(course.status) === "open".
+    */
     const status = safe(
       course && (
         course.status ||
@@ -2027,14 +2031,7 @@
       )
     ).toLowerCase();
 
-    /*
-      EXACTLY MATCH THE QUESTIONS ADMIN PAGE:
-      only "open" or "مفتوح" is considered open.
-    */
-    return (
-      status === "open" ||
-      status === "مفتوح"
-    );
+    return status === "open";
   }
 
   function getAnyCourseId(item){
@@ -2189,32 +2186,44 @@
   }
 
   function visibleQuestionIds(exam,courseId){
-    const map =
+    const selectedCourseId = safe(courseId);
+
+    if(!selectedCourseId){
+      return [];
+    }
+
+    const byCourse =
       exam &&
       exam.visibleQuestionsByCourse &&
       typeof exam.visibleQuestionsByCourse === "object"
         ? exam.visibleQuestionsByCourse
         : {};
 
-    const wanted = safe(courseId);
-
-    let value = null;
-
-    if(Object.prototype.hasOwnProperty.call(map,wanted)){
-      value = map[wanted];
-    }else{
-      const matchingKey = Object.keys(map).find(key=>
-        safe(key) === wanted
-      );
-
-      if(matchingKey){
-        value = map[matchingKey];
-      }
+    /*
+      EXACT compatibility with Student Exam System:
+      - no course key => hidden
+      - [] => hidden
+      - [question ids...] => shown
+    */
+    if(
+      !Object.prototype.hasOwnProperty.call(
+        byCourse,
+        selectedCourseId
+      )
+    ){
+      return [];
     }
 
-    return Array.isArray(value)
-      ? value.map(safe).filter(Boolean)
-      : [];
+    const ids =
+      Array.isArray(byCourse[selectedCourseId])
+        ? byCourse[selectedCourseId]
+        : [];
+
+    return [...new Set(
+      ids
+        .map(safe)
+        .filter(Boolean)
+    )];
   }
 
   function resultMatchesStudent(row){
@@ -2534,67 +2543,71 @@
       });
 
     /*
-      Saved results:
-      support all known course-id fields so a solved homework is not shown again.
+      Completion map: exam + course.
+      A completed exam must remain in Results, but must not notify again.
     */
-    const resultKeySet = new Set(
-      resultRows.map(function(row){
-        return (
-          safe(row.examId) +
-          "__" +
-          getAnyCourseId(row)
-        );
-      })
-    );
+    const resultsByExamCourse = new Map();
 
-    const homeworkExamIds = new Set();
-    const homeworkRows = [];
+    resultRows.forEach(function(row){
+      const key =
+        safe(row.examId) +
+        "__" +
+        getAnyCourseId(row);
 
+      if(!resultsByExamCourse.has(key)){
+        resultsByExamCourse.set(key,[]);
+      }
+
+      resultsByExamCourse.get(key).push(row);
+    });
+
+    const availableExamIds = new Set();
+    const notificationRows = [];
+
+    /*
+      IMPORTANT:
+      This now mirrors the Student Exam page, not only Homework skill.
+      If ANY exam has one or more IDs in
+      visibleQuestionsByCourse[OPEN_COURSE_ID], it is available there,
+      therefore it must generate a student notification until completed.
+    */
     state.examMap.forEach(function(exam){
       const examId = safe(exam.id);
 
       state.openCourseIds.forEach(function(courseId){
-
-        /*
-          1) Determine the questions that REALLY belong to this course
-             using the SAME base/linked logic as the admin page.
-        */
-        const allowedQuestionIds =
-          courseQuestionIdsForExam(
-            exam,
-            examId,
-            courseId,
-            state.questions
-          );
-
-        if(!allowedQuestionIds.length){
-          return;
-        }
-
-        const allowedSet =
-          new Set(allowedQuestionIds);
-
-        /*
-          2) Read Shown IDs for the exact course.
-        */
         const shownIds =
           visibleQuestionIds(
             exam,
             courseId
-          ).filter(function(id){
-            return allowedSet.has(safe(id));
-          });
+          );
 
-        /*
-          Admin considers the model Shown only when at least one
-          valid course question exists in visibleQuestionsByCourse.
-        */
         if(!shownIds.length){
           return;
         }
 
+        /*
+          The Student Exam list does not preload/filter the questions
+          collection before deciding that the exam is available.
+          Therefore notification availability follows the same rule:
+          visibleQuestionsByCourse alone is the permission source.
+        */
+        availableExamIds.add(examId);
+
+        const key =
+          examId + "__" + safe(courseId);
+
+        const done =
+          (resultsByExamCourse.get(key) || []).length > 0;
+
+        /*
+          Keep a useful label:
+          Homework when the shown questions/course skill says Homework,
+          Quiz when exam metadata says Quiz,
+          otherwise Exam.
+          The LABEL does not control whether the alert exists.
+        */
         const shownSet =
-          new Set(shownIds.map(safe));
+          new Set(shownIds);
 
         const shownQuestions =
           state.questions.filter(function(question){
@@ -2604,15 +2617,8 @@
             );
           });
 
-        /*
-          3) IMPORTANT FIX:
-             The admin can change a linked course's skill independently using
-             exam.groupSkillsByCourse[courseId][group].
-             The old portal ignored that field, causing some Homework
-             notifications to disappear for some students.
-        */
-        const shownHomeworkQuestions =
-          shownQuestions.filter(function(question){
+        const hasHomeworkQuestion =
+          shownQuestions.some(function(question){
             return isHomeworkQuestionForCourse(
               exam,
               question,
@@ -2620,54 +2626,35 @@
             );
           });
 
-        const explicitHomework =
-          isHomeworkExam(exam) ||
-          shownHomeworkQuestions.length > 0;
+        const kind =
+          (isHomeworkExam(exam) || hasHomeworkQuestion)
+            ? "homework"
+            : isQuizExam(exam)
+              ? "quiz"
+              : "exam";
 
-        const explicitQuiz =
-          isQuizExam(exam);
-
-        if(!explicitHomework && !explicitQuiz){
-          return;
-        }
-
-        homeworkExamIds.add(examId);
-
-        const resultKey =
-          examId + "__" + safe(courseId);
-
-        const done =
-          resultKeySet.has(resultKey);
-
-        homeworkRows.push({
+        notificationRows.push({
           ...exam,
           courseId:courseId,
           done:done,
-          prudleAssessmentKind:
-            explicitHomework
-              ? "homework"
-              : "quiz",
-          homeworkQuestionCount:
-            explicitHomework
-              ? (
-                  shownHomeworkQuestions.length ||
-                  shownIds.length
-                )
-              : shownIds.length,
-          shownQuestionIds:
-            shownIds.slice()
+          prudleAssessmentKind:kind,
+          homeworkQuestionCount:shownIds.length,
+          shownQuestionIds:shownIds.slice()
         });
       });
     });
 
+    /*
+      Every shown, unfinished exam produces a notification.
+    */
     state.openHomework =
-      homeworkRows.filter(function(item){
+      notificationRows.filter(function(item){
         return !item.done;
       });
 
     /*
-      Keep stored homework/quiz results visible in history,
-      but only for currently OPEN courses.
+      Keep completed exam/homework/quiz results visible in the history
+      when their course is currently open.
     */
     state.homeworkResults =
       resultRows.filter(function(row){
@@ -2675,7 +2662,7 @@
           getAnyCourseId(row);
 
         return (
-          homeworkExamIds.has(
+          availableExamIds.has(
             safe(row.examId)
           ) &&
           courseId &&
@@ -2686,11 +2673,11 @@
     state.homeworkResultsReady = true;
 
     console.debug(
-      "[Prudle notifications]",
+      "[Prudle notification sync]",
       "student=",state.studentKey,
       "openCourses=",Array.from(state.openCourseIds),
-      "openHomework=",state.openHomework.length,
-      "results=",state.homeworkResults.length
+      "shownUnfinishedExams=",state.openHomework.length,
+      "completedShownExams=",state.homeworkResults.length
     );
   }
 
@@ -3158,7 +3145,7 @@
                     item.examTitle ||
                     exam.title ||
                     exam.examTitle ||
-                    (isQuiz ? "Quiz" : "واجب")
+                    (isExam ? "Exam" : (isQuiz ? "Quiz" : "واجب"))
                   ) +
                 '</div>' +
                 '<div class="prudle-item-course">' +
@@ -3576,7 +3563,7 @@
     const note = document.getElementById("prudleSmartNotificationText");
     if(note){
       note.textContent = total
-        ? `لديك ${total} مهمة جديدة: ${individual} نشاط Individual و ${homework} واجب.`
+        ? `لديك ${total} مهمة جديدة: ${individual} نشاط و ${homework} اختبار/واجب متاح.`
         : "لا توجد مهام جديدة حاليًا.";
     }
 
