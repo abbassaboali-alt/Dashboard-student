@@ -1354,6 +1354,69 @@
   }
 </style>
 
+
+<style id="prudle-immediate-notification-flash">
+  @keyframes prudleTopBellFlash{
+    0%,100%{
+      box-shadow:0 0 0 0 rgba(239,68,68,0);
+      transform:scale(1);
+    }
+    25%{
+      box-shadow:0 0 0 10px rgba(239,68,68,.16);
+      transform:scale(1.035);
+    }
+    50%{
+      box-shadow:0 0 0 4px rgba(245,158,11,.20);
+      transform:scale(1.015);
+    }
+    75%{
+      box-shadow:0 0 0 12px rgba(16,185,129,.14);
+      transform:scale(1.04);
+    }
+  }
+
+  @keyframes prudleBellIconShake{
+    0%,100%{transform:rotate(0)}
+    20%{transform:rotate(-14deg)}
+    40%{transform:rotate(12deg)}
+    60%{transform:rotate(-9deg)}
+    80%{transform:rotate(7deg)}
+  }
+
+  #prudleTopNotificationBtn.prudle-has-notification{
+    background:linear-gradient(135deg,#ef4444,#f59e0b) !important;
+    border-color:rgba(255,255,255,.65) !important;
+    animation:prudleTopBellFlash 1.05s ease-in-out 4;
+  }
+
+  #prudleTopNotificationBtn.prudle-has-notification > span:first-child{
+    display:inline-block;
+    animation:prudleBellIconShake .55s ease-in-out 6;
+    transform-origin:50% 15%;
+  }
+
+  .prudle-smart-card.notification.prudle-has-notification{
+    border-color:#f6c453 !important;
+    background:linear-gradient(135deg,#fffdf3,#fff8dc) !important;
+    animation:prudleTopBellFlash 1.05s ease-in-out 3;
+  }
+
+  .prudle-smart-count.prudle-flash-count,
+  #prudleTopNotificationCount.prudle-flash-count{
+    animation:prudleTopBellFlash .9s ease-in-out 3;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    #prudleTopNotificationBtn.prudle-has-notification,
+    #prudleTopNotificationBtn.prudle-has-notification > span:first-child,
+    .prudle-smart-card.notification.prudle-has-notification,
+    .prudle-smart-count.prudle-flash-count,
+    #prudleTopNotificationCount.prudle-flash-count{
+      animation:none !important;
+    }
+  }
+</style>
+
 </head>
 <body>
 <div class="page-shell">
@@ -3512,6 +3575,59 @@
     document.documentElement.classList.remove("prudle-modal-open");
   };
 
+  function prudleFlashNotificationUI(){
+    var topBtn =
+      document.getElementById("prudleTopNotificationBtn");
+
+    var topCount =
+      document.getElementById("prudleTopNotificationCount");
+
+    var smartCard =
+      document.querySelector(
+        ".prudle-smart-card.notification"
+      );
+
+    var smartCount =
+      document.getElementById(
+        "prudleSmartNotificationCount"
+      );
+
+    if(topBtn){
+      topBtn.classList.remove("prudle-has-notification");
+      void topBtn.offsetWidth;
+      topBtn.classList.add("prudle-has-notification");
+    }
+
+    if(smartCard){
+      smartCard.classList.remove("prudle-has-notification");
+      void smartCard.offsetWidth;
+      smartCard.classList.add("prudle-has-notification");
+    }
+
+    [topCount,smartCount].forEach(function(el){
+      if(!el) return;
+      el.classList.remove("prudle-flash-count");
+      void el.offsetWidth;
+      el.classList.add("prudle-flash-count");
+    });
+
+    setTimeout(function(){
+      if(topBtn){
+        topBtn.classList.remove("prudle-has-notification");
+      }
+
+      if(smartCard){
+        smartCard.classList.remove("prudle-has-notification");
+      }
+
+      [topCount,smartCount].forEach(function(el){
+        if(el){
+          el.classList.remove("prudle-flash-count");
+        }
+      });
+    },4300);
+  }
+
   function renderCounters(){
     const individual = state.openIndividual.length;
     const homework = state.openHomework.length;
@@ -3857,6 +3973,34 @@ td.score{font-weight:900;direction:ltr}
       ...state.openIndividual.map(item=>"i:"+safe(item.id)),
       ...state.openHomework.map(item=>"h:"+safe(item.id)+":"+safe(item.courseId))
     ].sort().join("|");
+    var currentTotal =
+      (state.openIndividual || []).length +
+      (state.openHomework || []).length;
+
+    var previousRenderedTotal =
+      Number(
+        window.__prudleLastRenderedNotificationTotal || 0
+      );
+
+    /*
+      Immediate visual alert:
+      - first page load with pending items -> flash immediately
+      - later increase in pending items -> flash again
+    */
+    if(
+      currentTotal > 0 &&
+      (
+        !window.__prudleNotificationInitialFlashDone ||
+        currentTotal > previousRenderedTotal
+      )
+    ){
+      window.__prudleNotificationInitialFlashDone = true;
+      setTimeout(prudleFlashNotificationUI,0);
+    }
+
+    window.__prudleLastRenderedNotificationTotal =
+      currentTotal;
+
   }
 
   function maybeToastNewItems(){
@@ -3958,6 +4102,7 @@ td.score{font-weight:900;direction:ltr}
     }
 
     switchPrudleStudentTab(tab);
+    renderAll();
 
     if(state.studentKey){
       /*
@@ -4130,7 +4275,7 @@ td.score{font-weight:900;direction:ltr}
   };
 
   async function boot(){
-var attempts = 0;
+    var attempts = 0;
     var maxAttempts = 20;
 
     async function tryStart(){
@@ -4141,7 +4286,7 @@ var attempts = 0;
 
         if(!state.studentKey){
           if(attempts < maxAttempts){
-            setTimeout(tryStart,250);
+            setTimeout(tryStart,120);
           }
           return;
         }
@@ -4150,30 +4295,34 @@ var attempts = 0;
 
         if(!ok){
           if(attempts < maxAttempts){
-            setTimeout(tryStart,350);
-          }else{
-            var noStudent =
-              '<div class="prudle-empty-smart">' +
-              'تعذر تحميل بيانات الطالب. حدّث الصفحة أو سجّل الدخول مرة أخرى.' +
-              '</div>';
-
-            var nf0 =
-              document.getElementById("prudleNotificationFeed");
-            var hf0 =
-              document.getElementById("prudleHistoryFeed");
-
-            if(nf0) nf0.innerHTML = noStudent;
-            if(hf0) hf0.innerHTML = noStudent;
+            setTimeout(tryStart,180);
           }
           return;
         }
 
         /*
-          Load notifications/results immediately on portal entry.
-          No click on Activities, Homework or Notifications is required.
+          IMMEDIATE FIRST PAINT:
+          Load exam/homework notifications first and render them immediately,
+          before waiting for activity history/live-session work.
         */
-        await refreshNonRealtimeData();
-        renderAll();
+        try{
+          await loadHomeworkState();
+          renderAll();
+        }catch(error){
+          console.warn("Immediate homework notification load:",error);
+        }
+
+        /*
+          Then complete activity/result loading immediately after.
+        */
+        try{
+          await loadActivityHistory();
+          await loadLiveActivityNotificationsOnce();
+          renderAll();
+          maybeToastNewItems();
+        }catch(error){
+          console.warn("Immediate activity notification load:",error);
+        }
 
         listenIndividualSessions();
 
@@ -4181,9 +4330,12 @@ var attempts = 0;
           clearInterval(state.refreshTimer);
         }
 
+        /*
+          Fast fallback refresh after initial load.
+        */
         state.refreshTimer = setInterval(
           refreshNonRealtimeData,
-          10000
+          5000
         );
 
       }catch(error){
@@ -4194,7 +4346,7 @@ var attempts = 0;
         );
 
         if(attempts < maxAttempts){
-          setTimeout(tryStart,500);
+          setTimeout(tryStart,250);
         }
       }
     }
@@ -4225,15 +4377,23 @@ var attempts = 0;
 
     loadStudentContext()
       .then(function(ok){
-        if(!ok) return;
-        return refreshNonRealtimeData();
+        if(!ok) return null;
+        return loadHomeworkState();
       })
       .then(function(){
         renderAll();
+        return loadActivityHistory();
+      })
+      .then(function(){
+        return loadLiveActivityNotificationsOnce();
+      })
+      .then(function(){
+        renderAll();
+        maybeToastNewItems();
         listenIndividualSessions();
       })
       .catch(function(error){
-        console.warn("Identity-ready notification refresh:",error);
+        console.warn("Identity-ready immediate notification refresh:",error);
       });
   });
 
@@ -4249,15 +4409,22 @@ var attempts = 0;
 
     loadStudentContext()
       .then(function(ok){
-        if(!ok) return;
-        return refreshNonRealtimeData();
+        if(!ok) return null;
+        return loadHomeworkState();
+      })
+      .then(function(){
+        renderAll();
+        return loadActivityHistory();
+      })
+      .then(function(){
+        return loadLiveActivityNotificationsOnce();
       })
       .then(function(){
         renderAll();
         listenIndividualSessions();
       })
       .catch(function(error){
-        console.warn("pageshow notification refresh:",error);
+        console.warn("pageshow immediate notification refresh:",error);
       });
   });
 
