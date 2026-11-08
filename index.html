@@ -3975,34 +3975,6 @@ td.score{font-weight:900;direction:ltr}
     <span>${new Date().toLocaleDateString("en-GB")}</span>
   </div>
 </div>
-<script id="prudle-pdf-panel-script">
-(function(){'use strict';
-const api='https://api-prudle.abbassaboali.workers.dev';
-const $=id=>document.getElementById(id);
-let currentBlob=null;
-const info=msg=>{$('prudlePdfStatus').textContent=msg};
-const cfg={apiKey:'AIzaSyCCFBvZosI8dwShZjxvZzI-SU5igEbcOKk',authDomain:'prudle-system.firebaseapp.com',projectId:'prudle-system'};
-if(!window.firebase || typeof firebase.auth!=='function'){info('Firebase Authentication is not loaded.');return;}
-if(!firebase.apps.length)firebase.initializeApp(cfg);
-const auth=firebase.auth();
-async function token(){const user=auth.currentUser;if(!user)throw new Error('Please sign in using your Prudle account.');return user.getIdToken()}
-async function pdfRequest(path){const res=await fetch(api+path,{headers:{Authorization:'Bearer '+await token()}});if(!res.ok){let err={};try{err=await res.json()}catch{}throw new Error(err.error||'HTTP '+res.status)}return res}
-function button(text,fn){const b=document.createElement('button');b.textContent=text;b.type='button';b.onclick=fn;return b}
-async function openPdf(item,download){try{info('Loading PDF…');const r=await pdfRequest('/pdf/resources/'+encodeURIComponent(item.id)+(download?'?download=1':''));const blob=await r.blob();const url=URL.createObjectURL(blob);
-if(download){const a=document.createElement('a');a.href=url;a.download=(item.title||'Prudle-Document').replace(/[\/:*?"<>|]/g,'_')+'.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),20000);info('Download started.');return}
-closePdf();currentBlob=url;$('prudlePdfTitle').textContent=item.title||'PDF';$('prudlePdfFrame').src=url;$('prudlePdfDialog').classList.add('pp-open');document.body.style.overflow='hidden';info('PDF opened.');}catch(e){info(e.message)}}
-function closePdf(){$('prudlePdfDialog').classList.remove('pp-open');$('prudlePdfFrame').src='about:blank';document.body.style.overflow='';if(currentBlob){URL.revokeObjectURL(currentBlob);currentBlob=null}}
-$('prudlePdfClose').onclick=closePdf;
-$('prudlePdfDialog').addEventListener('click',e=>{if(e.target===$('prudlePdfDialog'))closePdf()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closePdf()});
-async function load(){const root=$('prudlePdfItems');root.replaceChildren();if(!auth.currentUser){info('Sign in to Prudle with Firebase Authentication to see your course resources.');return}
-info('Loading PDF files…');try{let files=[],cursor='';for(let i=0;i<20;i++){const url='/pdf/resources'+(cursor?'?cursor='+encodeURIComponent(cursor):'');const data=await (await pdfRequest(url)).json();files.push(...(data.items||[]));if(!data.hasMore||!data.cursor)break;cursor=data.cursor}
-files=files.filter(f=>f.active);if(!files.length){info('No PDF files available for your courses.');return}
-for(const f of files){const scope=f.scope||{};const card=document.createElement('div');card.className='pp-file';const title=document.createElement('strong');title.textContent='📄 '+(f.title||'PDF');const meta=document.createElement('div');meta.className='pp-meta';meta.textContent=[scope.course,scope.period,scope.branch,scope.section,f.category].filter(Boolean).join(' · ');const actions=document.createElement('div');actions.className='pp-actions';actions.append(button('View PDF',()=>openPdf(f,false)),button('Download',()=>openPdf(f,true)));card.append(title,meta,actions);root.append(card)}info(files.length+' course PDF file(s) available.');}catch(e){info('Could not load files: '+e.message)}}
-$('prudlePdfRefresh').onclick=load;
-auth.onAuthStateChanged(load);
-})();
-</script>
 </body>
 </html>`;
 
@@ -4593,5 +4565,34 @@ auth.onAuthStateChanged(load);
 })();
 </script>
 
+
+<script id="prudle-pdf-panel-script">
+(function(){'use strict';
+const api='https://api-prudle.abbassaboali.workers.dev';
+const $=id=>document.getElementById(id);
+let currentBlob=null;
+const info=msg=>{$('prudlePdfStatus').textContent=msg};
+const cfg={apiKey:'AIzaSyCCFBvZosI8dwShZjxvZzI-SU5igEbcOKk',authDomain:'prudle-system.firebaseapp.com',projectId:'prudle-system'};
+if(!window.firebase || typeof firebase.auth!=='function'){info('Firebase Authentication is not loaded.');return;}
+if(!firebase.apps.length)firebase.initializeApp(cfg);
+const auth=firebase.auth();
+async function token(){const user=auth.currentUser;if(!user)throw new Error('Please sign in using your Prudle account.');return user.getIdToken()}
+async function pdfRequest(path){const res=await fetch(api+path,{headers:{Authorization:'Bearer '+await token()}});if(!res.ok){let err={};try{err=await res.json()}catch{}throw new Error(err.error||'HTTP '+res.status)}return res}
+function button(text,fn){const b=document.createElement('button');b.textContent=text;b.type='button';b.onclick=fn;return b}
+async function openPdf(item,download){try{info('Loading PDF…');const r=await pdfRequest('/pdf/resources/'+encodeURIComponent(item.id)+(download?'?download=1':''));const blob=await r.blob();const url=URL.createObjectURL(blob);
+if(download){const a=document.createElement('a');a.href=url;a.download=(item.title||'Prudle-Document').replace(/[\/:*?"<>|]/g,'_')+'.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),20000);info('Download started.');return}
+closePdf();currentBlob=url;$('prudlePdfTitle').textContent=item.title||'PDF';$('prudlePdfFrame').src=url;$('prudlePdfDialog').classList.add('pp-open');document.body.style.overflow='hidden';info('PDF opened.');}catch(e){info(e.message)}}
+function closePdf(){$('prudlePdfDialog').classList.remove('pp-open');$('prudlePdfFrame').src='about:blank';document.body.style.overflow='';if(currentBlob){URL.revokeObjectURL(currentBlob);currentBlob=null}}
+$('prudlePdfClose').onclick=closePdf;
+$('prudlePdfDialog').addEventListener('click',e=>{if(e.target===$('prudlePdfDialog'))closePdf()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePdf()});
+async function load(){const root=$('prudlePdfItems');root.replaceChildren();if(!auth.currentUser){info('Sign in to Prudle with Firebase Authentication to see your course resources.');return}
+info('Loading PDF files…');try{let files=[],cursor='';for(let i=0;i<20;i++){const url='/pdf/resources'+(cursor?'?cursor='+encodeURIComponent(cursor):'');const data=await (await pdfRequest(url)).json();files.push(...(data.items||[]));if(!data.hasMore||!data.cursor)break;cursor=data.cursor}
+files=files.filter(f=>f.active);if(!files.length){info('No PDF files available for your courses.');return}
+for(const f of files){const scope=f.scope||{};const card=document.createElement('div');card.className='pp-file';const title=document.createElement('strong');title.textContent='📄 '+(f.title||'PDF');const meta=document.createElement('div');meta.className='pp-meta';meta.textContent=[scope.course,scope.period,scope.branch,scope.section,f.category].filter(Boolean).join(' · ');const actions=document.createElement('div');actions.className='pp-actions';actions.append(button('View PDF',()=>openPdf(f,false)),button('Download',()=>openPdf(f,true)));card.append(title,meta,actions);root.append(card)}info(files.length+' course PDF file(s) available.');}catch(e){info('Could not load files: '+e.message)}}
+$('prudlePdfRefresh').onclick=load;
+auth.onAuthStateChanged(load);
+})();
+</script>
 </body>
 </html>
